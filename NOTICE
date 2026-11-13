@@ -1,0 +1,71 @@
+TERRA-X
+Copyright 2026 TERRA-X contributors
+
+This product is an independent research prototype. It is not an official NASA product and
+is not affiliated with, endorsed by, or sponsored by the National Aeronautics and Space
+Administration (NASA), the U.S. Geological Survey (USGS), the European Space Agency (ESA),
+the European Union, or any other government agency. Agency, mission, and product names are
+used only to identify the sources of data.
+
+The code is licensed under the Apache License, Version 2.0. See LICENSE. Data products and
+services retain their own terms; the notices below are provided for attribution and do not
+imply endorsement.
+
+Data and service attributions
+-----------------------------
+
+NASA LRO LOLA global DEM (LDEM_128), NASA PDS Geosciences Node
+  Public domain (NASA). Citation: Smith et al. (2010), The Lunar Orbiter Laser Altimeter on
+  the Lunar Reconnaissance Orbiter Mission, Space Science Reviews 150, 209-241.
+  https://pds-geosciences.wustl.edu/
+
+NASA MGS MOLA global DEM (MEGDR 463 m), NASA PDS Geosciences Node
+  Public domain (NASA). Citation: Smith et al. (2001), Mars Orbiter Laser Altimeter:
+  Experiment summary after the first year of global mapping of Mars, JGR 106, 23689-23722.
+  https://pds-geosciences.wustl.edu/
+
+NASA LRO WAC global mosaic (303 ppd), NASA/GSFC/ASU, NASA TREK
+  Public domain (NASA). https://trek.nasa.gov/moon/
+
+NASA Mars Viking MDIM21 color mosaic, NASA/JPL/USGS
+  Public domain (NASA). https://nasa3d.arc.nasa.gov/
+
+NASA GIBS Blue Marble / VIIRS imagery, NASA EOSDIS
+  Public domain (NASA). https://earthdata.nasa.gov/gibs
+
+NASA Common Metadata Repository (CMR), NASA EOSDIS
+  Public domain (NASA). https://cmr.earthdata.nasa.gov/
+
+NASA FIRMS VIIRS active-fire detections, NASA EOSDIS (optional, credential-gated)
+  Public domain (NASA). https://firms.modaps.eosdis.nasa.gov/
+
+Copernicus DEM GLO-30, produced from WorldDEM, (c) ESA/DLR/Airbus
+  Copernicus DEM open licence.
+  https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM
+
+ESA WorldCover 2021 v200, ESA
+  Creative Commons Attribution 4.0 International (CC BY 4.0).
+  https://worldcover2021.esa.int/
+
+Sentinel-2 L2A surface reflectance, ESA/Copernicus, accessed through Earth Search v1 by
+Element 84 on AWS Open Data
+  Creative Commons Attribution 4.0 International (CC BY 4.0).
+  https://registry.opendata.aws/sentinel-2/
+
+AWS Terrain Tiles (Mapzen/Tilezen), AWS Open Data / Tilezen
+  Open Data Commons Attribution License (ODC-By).
+  https://registry.opendata.aws/terrain-tiles/
+
+OpenStreetMap Nominatim reverse geocoder, OpenStreetMap Foundation
+  Open Database License (ODbL) 1.0. (c) OpenStreetMap contributors.
+  https://www.openstreetmap.org/copyright
+
+Natural Earth 1:110m land polygons, Natural Earth
+  Public domain. https://www.naturalearthdata.com/
+
+NOAA ETOPO 2022 60 arc-second surface elevation, NOAA NCEI
+  Public domain (NOAA). https://www.ncei.noaa.gov/products/etopo-global-relief-model
+
+Python, FastAPI, SQLAlchemy, PostGIS, NumPy, SciPy, Rasterio, Next.js, React, and Three.js
+are used under their respective open-source licenses. See the dependency lock files for the
+resolved versions.

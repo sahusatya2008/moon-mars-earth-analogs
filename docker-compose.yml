@@ -1,0 +1,98 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-terrax}
+      POSTGRES_USER: ${POSTGRES_USER:-terrax}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-terrax}
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-terrax} -d ${POSTGRES_DB:-terrax}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-terrax}:${POSTGRES_PASSWORD:-terrax}@db:5432/${POSTGRES_DB:-terrax}
+      TERRAX_DATA_DIR: /data
+      TERRAX_CACHE_DIR: /data/cache
+      TERRAX_REPORT_DIR: /data/reports
+    command:
+      - sh
+      - -c
+      # Seed is idempotent and fills a fresh volume with the authoritative catalog,
+      # planetary bodies, and preset regions before the API accepts traffic.
+      - alembic upgrade head && python -m terrax.seed && exec uvicorn terrax.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["python", "-m", "terrax.worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-terrax}:${POSTGRES_PASSWORD:-terrax}@db:5432/${POSTGRES_DB:-terrax}
+      TERRAX_DATA_DIR: /data
+      TERRAX_CACHE_DIR: /data/cache
+      TERRAX_REPORT_DIR: /data/reports
+    volumes:
+      - ./data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      TERRAX_API_BASE_URL: http://api:8000
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["scale"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

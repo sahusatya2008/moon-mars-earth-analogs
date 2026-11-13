@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Ruff + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: terrax_test
+          POSTGRES_USER: terrax
+          POSTGRES_PASSWORD: terrax
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U terrax -d terrax_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://terrax:terrax@localhost:5432/terrax_test
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.x"
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --frozen --extra dev
+      - name: Lint
+        run: uv run ruff check terrax tests
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+      - name: Test
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  containers:
+    name: Docker images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate compose file
+        run: docker compose config > /dev/null
+      - name: Build API, worker, and web images
+        run: docker compose build

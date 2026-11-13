@@ -1,0 +1,14 @@
+.git
+.gitignore
+.DS_Store
+**/.DS_Store
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.venv
+apps/web/node_modules
+apps/web/.next
+data
+.scratch
+docs
+*.log

@@ -1,0 +1,37 @@
+.env
+.env.local
+.env.*.local
+.Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+
+# scientific cache / generated outputs (large; reproducible)
+data/cache/
+data/reports/
+data/exports/
+data/runs/
+data/textures/*.jpg
+data/textures/*.png
+!data/textures/.gitkeep
+data/fixtures/synthetic/*.tif
+
+# local database / logs
+*.log
+*.db
+*.sqlite
+pgdata/
+
+# local scratch virtualenv
+.scratch/
