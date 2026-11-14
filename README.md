@@ -295,9 +295,9 @@ gated products remain intentionally out of the core path.
 
 ## License and attribution
 
-The SNSX SPACE source code is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE).
+The SNSX SPACE source code is licensed under the **MIT License**. See [LICENSE](LICENSE).
 Data products and services retain their own terms and are attributed in [NOTICE](NOTICE). The
-Apache license does not grant rights to NASA, USGS, ESA, Copernicus, or other agency names or
+MIT license does not grant rights to NASA, USGS, ESA, Copernicus, or other agency names or
 marks, and nothing in this repository implies endorsement by those agencies.
 
 ## Verification

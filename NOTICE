@@ -1,5 +1,5 @@
 SNSX SPACE
-Copyright 2026 SNSX SPACE contributors
+Copyright 2026 CEH. Satya Narayan Sahu
 
 This product is an independent research prototype. It is not an official NASA product and
 is not affiliated with, endorsed by, or sponsored by the National Aeronautics and Space
@@ -7,7 +7,7 @@ Administration (NASA), the U.S. Geological Survey (USGS), the European Space Age
 the European Union, or any other government agency. Agency, mission, and product names are
 used only to identify the sources of data.
 
-The code is licensed under the Apache License, Version 2.0. See LICENSE. Data products and
+The code is licensed under the MIT License. See LICENSE. Data products and
 services retain their own terms; the notices below are provided for attribution and do not
 imply endorsement.
 
