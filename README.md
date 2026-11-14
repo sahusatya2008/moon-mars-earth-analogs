@@ -84,8 +84,9 @@ docker compose up --build
 - Health: <http://localhost:8000/api/v1/health>
 - PostGIS: `localhost:5434`
 
-The API container applies migrations before starting. The worker waits for API health, then claims
-jobs. An optional Redis profile exists but is not used by the default queue.
+The API container applies migrations and idempotently seeds the catalog before starting, so a fresh
+volume comes up with all 16 datasets and 9 preset regions. The worker waits for API health, then
+claims jobs. An optional Redis profile exists but is not used by the default queue.
 
 ## Local development
 
@@ -154,6 +155,18 @@ npm run typecheck
 npm run build
 ```
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs three jobs on every push to `main` and every pull request:
+
+- **backend** — starts a `postgis/postgis:16-3.4` service, installs the locked environment with
+  `uv sync --frozen --extra dev`, runs Ruff, applies Alembic migrations to `terrax_test`, and runs
+  the full pytest suite;
+- **frontend** — installs with `npm ci`, runs `tsc --noEmit`, then a production `next build`;
+- **containers** — validates `docker-compose.yml` and builds the API, worker, and web images.
+
+The workflow uses only free GitHub-hosted runners and needs no secrets.
+
 ## Scientific position
 
 **Scored dimensions:** geomorphology (0.35), morphometry (0.30), texture (0.20), operational
@@ -207,9 +220,9 @@ marks, and nothing in this repository implies endorsement by those agencies.
 
 ## Verification
 
-Executed on 2026-11-13:
+Executed on 2026-11-13, with the container checks below run on 2026-11-14:
 
-- backend: **54 passed**, 3 non-failing warnings; Ruff clean;
+- backend: **56 passed**, 3 non-failing warnings; Ruff clean;
 - frontend: TypeScript clean and production build passed, including `/terrain`;
 - canonical Moon run `0f81536a-fd92-4e90-80be-558679889b59`: 68 coarse samples, 3/3 refinements
   succeeded, 3 candidates, top similarity **0.789007** with **0.904513** high confidence;
@@ -223,7 +236,15 @@ Executed on 2026-11-13:
   browser-verified;
 - browser checks covered rankings, candidate comparison, reports, assistant, SSE progress, the
   no-WebGL fallback, and SwiftShader software-WebGL globe and terrain renders;
-- `docker compose config` passed; container images were not built.
+- **containerized stack verified**: API, worker, and web images built from the committed
+  Dockerfiles; a fresh PostGIS volume applied migrations and auto-seeded 16 datasets and
+  9 regions; the API became healthy; Moon, Mars, and Earth terrain requests each returned
+  80×80 real DEM cells; analysis `cf632ae1-7ee5-499c-af80-16e686a0d97e` ran through the
+  containerized worker to 3 candidates (top similarity **0.791431**, confidence **0.876997**);
+  GeoJSON report `21adf2b8-a66c-4a57-a623-5bdd086cb984` had no collection-wide CRS and
+  per-feature spatial references. The run used isolated ports `15434`/`18000`/`13000`.
+- the CI workflow is committed and YAML-validated but has not executed on GitHub (no remote
+  configured).
 
 See [docs/verification.md](docs/verification.md) for full run IDs, candidate tables, report
 checksums, browser observations, and unresolved gaps.

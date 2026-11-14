@@ -1,9 +1,9 @@
 # TERRA-X Verification Report
 
-**Executed:** 2026-11-13 (local session, UTC timestamps below)  
+**Executed:** 2026-11-13 (local session); container stack 2026-11-14  
 **Version:** algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.2.0`  
 **Environment:** macOS, Python 3.12 virtualenv, Node 22, PostgreSQL/PostGIS on `localhost:5434`,
-FastAPI on `:8000`, one worker, Next.js on `:3000`.
+FastAPI on `:8000`, one worker, Next.js on `:3000`; Docker Compose end-to-end on `15434`/`18000`/`13000`.
 
 This report records what was actually executed. It distinguishes automated checks, completed
 scientific runs, browser checks, and work that remains unverified. No test is marked passing
@@ -13,12 +13,13 @@ without a command and observed result.
 
 | Check | Command | Observed result |
 |---|---|---|
-| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **54 passed, 3 warnings** |
+| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **56 passed, 3 warnings** |
 | Backend lint | `.venv/bin/ruff check terrax tests` | **All checks passed** |
 | Frontend types | `npm run typecheck` | **Passed** (`tsc --noEmit`, no diagnostics) |
 | Frontend production build | `npm run build` | **Passed**; `/`, `/analyses`, `/terrain`, `/datasets`, `/methodology`, and dynamic `/analyses/[id]` emitted |
 | Compose syntax | `docker compose config` | **Exit 0**, rendered configuration accepted |
-| Docker image build | `docker compose build` | **Not executed** (see gaps) |
+| Docker image build | `docker compose ... build` | **Passed**; API **832 MB**, worker **832 MB**, web **304 MB** |
+| Compose end-to-end | isolated-port stack + `verify_compose.py` | **All checks passed** (see 1.1) |
 
 The three warnings are non-failing:
 
@@ -36,7 +37,35 @@ The terrain tests cover the DEM-to-mesh payload, strict JSON `null` handling for
 disk-cache round trips, rejection of a constant-zero AWS fallback, invalidation of a cached
 degenerate mesh, and route validation for unsupported bodies, invalid coordinates, and oversized
 footprints. The report tests assert that GeoJSON does not apply a collection-wide Earth CRS to
-Moon/Mars features. The observed count in this session was **54 passed**.
+Moon/Mars features. Config tests assert that the repository root resolves correctly in both the
+checkout layout (`<repo>/apps/api/terrax/config.py`) and the container layout
+(`/app/terrax/config.py`). The observed count in this session was **56 passed**.
+
+### 1.1 Containerized Compose run (2026-11-14)
+
+Images were built from the committed Dockerfiles: API **832 MB**, worker **832 MB**, web
+**304 MB**. `rasterio`'s manylinux wheel links `libexpat.so.1`, which `python:3.12-slim` omits, so
+the API runtime stage installs `libexpat1`; `python -c "import terrax.main"` now succeeds inside
+the image with `REPO_ROOT=/app`.
+
+The stack used isolated host ports—PostGIS `15434`, API `18000`, web `13000`—so an existing local
+development stack on `5434`/`8000`/`3000` stayed untouched. Its database volume was empty before
+the run.
+
+| Check | Observed result |
+|---|---|
+| Startup | initial migration `0697627b9ac4` applied; seed logged `{'planets': 3, 'datasets': 16, 'regions': 9}`; API became healthy |
+| Catalog | `/health` returned `status=ok`, `database=ok`, **16** datasets, **9** regions |
+| Web | landing returned HTTP 200 and contained the non-affiliation notice |
+| Moon terrain | `lro_lola_ldem_128ppd`, 80×80, **6,400/6,400** valid, −2,548.0 to −560.5 m |
+| Mars terrain | `mgs_mola_megdr_463m`, 80×80, **6,400/6,400** valid, −3,444.4 to 761.0 m |
+| Earth terrain | `copernicus_dem_glo30`, 80×80, **6,400/6,400** valid, 1,031.9 to 2,663.7 m |
+| Analysis | `cf632ae1-7ee5-499c-af80-16e686a0d97e` succeeded through the containerized worker; **3** candidates; top **Provincia de Antofagasta, Antofagasta Region, Chile**, similarity **0.791431**, confidence **0.876997** (high) |
+| GeoJSON | report `21adf2b8-a66c-4a57-a623-5bdd086cb984`, 6,029 bytes, no collection-wide `crs`, **4** features with `spatial_reference` |
+
+The worker also made live requests during the run: AWS Earth Search returned HTTP 200 and NASA
+GIBS returned HTTP 200, so refinement and context fetching were exercised over the network, not
+only from the local cache.
 
 ## 2. Completed scientific runs
 
@@ -276,8 +305,11 @@ production Next.js build and the development server both render the footer notic
 
 These are deliberately unresolved rather than hidden:
 
-1. **Docker images were not built.** `docker compose config` passes, but no container image or
-   containerized end-to-end run was executed. Local Python/Node processes were used for all tests.
+1. **Container verification is a development check, not a production deployment.** The images
+   build and the isolated-port Compose run passed on 2026-11-14, but the stack uses a host bind
+   mount, runs the API and worker as root, has no TLS or resource limits, and was not exercised
+   under load. The CI workflow is committed and YAML-validated but has not executed on GitHub
+   because no remote is configured.
 2. **No credential-gated live checks.** `NASA_EARTHDATA_TOKEN` and `NASA_FIRMS_MAP_KEY` were not
    configured. `/health` reports `earthdata_configured: false`; affected catalog rows report
    `requires_credentials`, not “connected”.
@@ -316,9 +348,14 @@ cd ../web
 npm run typecheck
 npm run build
 
-# Compose syntax (images intentionally not built)
+# Full container stack (build, migrations, idempotent seed)
 cd ../..
 docker compose config
+docker compose up -d --build
+curl http://localhost:8000/api/v1/health
+
+# The verified end-to-end run used isolated ports so a local dev stack was untouched:
+# PostGIS 15434, API 18000, web 13000.
 ```
 
 The canonical run can be re-created with the API:

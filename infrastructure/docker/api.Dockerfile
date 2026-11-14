@@ -10,11 +10,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # uv is used only to resolve the locked environment at build time.
 COPY --from=ghcr.io/astral-sh/uv:0.8 /uv /usr/local/bin/uv
 
+# rasterio's manylinux wheel dynamically links libexpat, which slim images omit.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install dependencies from the lock file before copying source for layer caching.
+# The uv cache mount keeps downloads across interrupted/retried builds.
 COPY apps/api/pyproject.toml apps/api/uv.lock ./
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 COPY apps/api/ ./
 
