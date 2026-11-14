@@ -39,6 +39,10 @@ NASA Common Metadata Repository (CMR), NASA EOSDIS
 NASA FIRMS VIIRS active-fire detections, NASA EOSDIS (optional, credential-gated)
   Public domain (NASA). https://firms.modaps.eosdis.nasa.gov/
 
+Meteomatics Weather API, Meteomatics AG (optional, credential-gated)
+  Meteomatics API terms and subscription. Model output is used as operational context only.
+  https://www.meteomatics.com/en/weather-api/
+
 Copernicus DEM GLO-30, produced from WorldDEM, (c) ESA/DLR/Airbus
   Copernicus DEM open licence.
   https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM

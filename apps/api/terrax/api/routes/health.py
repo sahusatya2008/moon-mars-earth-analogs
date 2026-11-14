@@ -43,6 +43,7 @@ def health(db: Session = Depends(get_db)) -> dict:
         "database": database,
         "worker_queue": {**queue_stats, "entity_counts": counts},
         "earthdata_configured": settings.earthdata_available,
+        "meteomatics_configured": settings.meteomatics_available,
         "llm_configured": settings.terrax_llm_provider != "none",
         "time": datetime.now(UTC),
     }

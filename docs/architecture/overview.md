@@ -1,6 +1,6 @@
 # TERRA-X Architecture
 
-**Status:** implemented baseline · version 0.3.0
+**Status:** implemented baseline · version 0.4.0
 
 **Scope:** planetary analogue discovery for Earth, the Moon, and Mars
 
@@ -39,6 +39,7 @@ The system is a **modular monolith plus independently scalable workers**:
              │ USGS LOLA/MOLA, Copernicus GLO-30, AWS Terrain     │
              │ Tiles, NASA GIBS/CMR, ESA WorldCover, Sentinel-2  │
              │ Microsoft Planetary Computer (DEM/LULC/optical)   │
+             │ Meteomatics weather (credentialed context)         │
              └───────────────────────────────────────────────────┘
 ```
 
@@ -82,7 +83,7 @@ check so migrations have completed before jobs are claimed. The database port is
 
 ```
 apps/api/terrax/
-  __init__.py             version constants (0.3.0)
+  __init__.py             version constants (0.4.0)
   config.py               environment + cache/report paths
   db.py                   SQLAlchemy engine/session
   models.py               normalized PostGIS schema (22 tables)
@@ -111,6 +112,7 @@ apps/api/terrax/
     etopo.py              optional NOAA ETOPO access
     worldcover.py         ESA WorldCover 10 m land cover
     planetary_computer.py Planetary Computer STAC, SAS signing, DEM/LULC/optical checks
+    meteomatics.py        credentialed point weather forecasts (context only)
     stac.py / cmr.py      Sentinel-2 and NASA CMR discovery
     gibs.py / trek.py     NASA imagery and planetary mosaics
     nominatim.py          reverse geocoding

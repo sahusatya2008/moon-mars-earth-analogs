@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..catalog import CATALOG_VERSION, dataset_map
 from ..config import get_settings
-from ..connectors import albedo, firms, nominatim, preview, stac, worldcover
+from ..connectors import albedo, firms, meteomatics, nominatim, preview, stac, worldcover
 from ..connectors import planetary_computer as pc
 from ..connectors.earth_dem import EarthDEM
 from ..connectors.planetary_dem import ReferenceDEM, load_reference_dem
@@ -618,6 +618,41 @@ def _candidate_context(
     except Exception as exc:
         context["firms"] = {"available": False, "error": str(exc)[:200]}
         # A missing FIRMS key is an expected configuration state, not a data defect.
+
+    if settings.meteomatics_available:
+        try:
+            weather = meteomatics.forecast(lat, lon)
+            context["meteomatics"] = weather
+            spec = dataset_map()["meteomatics_weather"]
+            db.add(
+                _evidence(
+                    analysis_id=analysis_id,
+                    candidate_id=candidate_id,
+                    dataset_id="meteomatics_weather",
+                    title="Meteomatics operational weather context",
+                    source_url=spec["source_url"],
+                    citation=spec["citation"],
+                    license=spec["license"],
+                    processing_level=spec["processing_level"],
+                    spatial_resolution_m=spec["spatial_resolution_m"],
+                    acquired_at=_parse_iso(weather["window"]["start"]),
+                    details={
+                        "role": "operational weather context (not scored)",
+                        **weather,
+                    },
+                )
+            )
+            used.add("meteomatics_weather")
+        except Exception as exc:
+            context["meteomatics"] = {"available": False, "error": str(exc)[:300]}
+            errors.append("Meteomatics weather context unavailable for this candidate.")
+    else:
+        # Credentials are optional, like FIRMS. Their absence is a configuration state,
+        # not a data defect, so it is recorded without adding a context error.
+        context["meteomatics"] = {
+            "available": False,
+            "reason": "METEOMATICS_USERNAME and METEOMATICS_PASSWORD are not configured",
+        }
 
     try:
         prev = preview.region_preview("earth", lon, lat, footprint_km)

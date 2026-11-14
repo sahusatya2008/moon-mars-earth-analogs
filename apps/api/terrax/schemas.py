@@ -33,6 +33,7 @@ class HealthResponse(BaseModel):
     database: str
     worker_queue: dict[str, Any]
     earthdata_configured: bool
+    meteomatics_configured: bool
     llm_configured: bool
     time: datetime
 

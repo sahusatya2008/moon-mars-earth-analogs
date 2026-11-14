@@ -52,6 +52,31 @@ function evidenceInsight(record: Evidence): string | null {
       }
     }
   }
+  if (record.dataset_id === "meteomatics_weather") {
+    const summary = details.summary;
+    if (summary && typeof summary === "object") {
+      const values = summary as Record<string, unknown>;
+      const parts: string[] = [];
+      if (typeof values.temperature_mean_c === "number") {
+        parts.push(`mean ${values.temperature_mean_c.toFixed(1)} °C`);
+      }
+      if (typeof values.wind_speed_max_ms === "number") {
+        parts.push(`wind max ${values.wind_speed_max_ms.toFixed(1)} m/s`);
+      }
+      if (typeof values.precipitation_sum_sampled_mm === "number") {
+        parts.push(`sampled precipitation ${values.precipitation_sum_sampled_mm.toFixed(1)} mm`);
+      }
+      if (typeof values.cloud_cover_mean_pct === "number") {
+        parts.push(`mean cloud ${Math.round(values.cloud_cover_mean_pct)}%`);
+      }
+      if (typeof values.relative_humidity_mean_pct === "number") {
+        parts.push(`humidity ${Math.round(values.relative_humidity_mean_pct)}%`);
+      }
+      return parts.length
+        ? `Weather context: ${parts.join(", ")}. Model forecast, not an in-situ measurement; not scored.`
+        : null;
+    }
+  }
   if (record.dataset_id === "pc_sentinel2_l2a" || record.dataset_id === "pc_landsat_c2_l2") {
     const parts: string[] = [];
     if (typeof details.cloud_cover === "number") parts.push(`cloud ${details.cloud_cover.toFixed(1)}%`);

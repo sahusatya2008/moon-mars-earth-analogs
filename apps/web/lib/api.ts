@@ -121,7 +121,7 @@ export const api = {
       { method: "POST" },
     ),
   health: (base = publicApiBase) =>
-    request<{ status: string; database: string; worker_queue: { counts: Record<string, number>; queued: number; running: number; entity_counts?: Record<string, number> }; earthdata_configured: boolean; llm_configured: boolean }>("/health", {}, base),
+    request<{ status: string; database: string; worker_queue: { counts: Record<string, number>; queued: number; running: number; entity_counts?: Record<string, number> }; earthdata_configured: boolean; meteomatics_configured: boolean; llm_configured: boolean }>("/health", {}, base),
   terrain: (
     body: string,
     lon: number,

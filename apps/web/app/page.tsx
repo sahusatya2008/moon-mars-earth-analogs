@@ -84,7 +84,7 @@ export default async function HomePage() {
       <section className="hero">
         <div className="shell hero-grid">
           <div>
-            <div className="eyebrow">Planetary analogue intelligence · v0.3</div>
+            <div className="eyebrow">Planetary analogue intelligence · v0.4</div>
             <h1 className="display">
               <span className="terra">TERRA</span>
               <span className="x">-X</span>
@@ -350,7 +350,8 @@ export default async function HomePage() {
             </h2>
             <p className="small muted">
               The catalog records NASA CMR, USGS Astrogeology, Copernicus DEM, ESA WorldCover,
-              Sentinel-2 L2A, NASA GIBS, and NASA FIRMS. Availability is probed, not assumed;
+              Sentinel-2 L2A, NASA GIBS, NASA FIRMS, Microsoft Planetary Computer, and
+              credentialed Meteomatics weather. Availability is probed, not assumed;
               credentials are reported as a configuration state.
             </p>
             <div style={{ marginTop: 18 }}>

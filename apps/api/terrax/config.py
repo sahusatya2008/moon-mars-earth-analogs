@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     nasa_earthdata_password: str | None = None
     nasa_firms_map_key: str | None = None
 
+    meteomatics_username: str | None = None
+    meteomatics_password: str | None = None
+
     terrax_llm_provider: str = "none"
     terrax_llm_model: str | None = None
     openai_api_key: str | None = None
@@ -106,6 +109,10 @@ class Settings(BaseSettings):
     @property
     def earthdata_available(self) -> bool:
         return bool(self.nasa_earthdata_token or (self.nasa_earthdata_username and self.nasa_earthdata_password))
+
+    @property
+    def meteomatics_available(self) -> bool:
+        return bool(self.meteomatics_username and self.meteomatics_password)
 
     def ensure_dirs(self) -> None:
         for p in (self.data_dir, self.cache_dir, self.report_dir):

@@ -145,9 +145,10 @@ export default function DatasetsPage() {
             Every product used by TERRA-X is registered with its agency, mission, resolution,
             license, citation, and access protocol. The Microsoft Planetary Computer collections
             are read through public STAC metadata and automatically issued, short-lived SAS
-            tokens; the tokens are never stored with results. Status is <b>unknown</b> until a
-            bounded probe reads the actual source. Credential-gated services are reported as
-            gated, never as connected.
+            tokens; the tokens are never stored with results. Credential-gated Meteomatics
+            weather evidence is attached only when account credentials are configured. Status is{" "}
+            <b>unknown</b> until a bounded probe reads the actual source. Credential-gated services
+            are reported as gated, never as connected.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>

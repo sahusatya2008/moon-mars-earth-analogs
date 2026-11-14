@@ -1,6 +1,6 @@
 # TERRA-X Scientific Methodology
 
-**Version:** 0.3.0 · algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.3.0`
+**Version:** 0.4.0 · algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.4.0`
 
 This document describes what the code actually computes. Declared constants are in
 `apps/api/terrax/engine/features.py` and `apps/api/terrax/engine/similarity.py`; each completed run
@@ -40,8 +40,9 @@ ranked score.
 
 ### Independent cross-checks
 
-The Microsoft Planetary Computer supplies four context-only checks. None of them changes a
-similarity score, confidence, or candidate rank.
+The Microsoft Planetary Computer supplies four context-only checks. Meteomatics adds a fifth,
+credential-gated weather check. None of them changes a similarity score, confidence, or candidate
+rank.
 
 | Product | Role | Comparison |
 |---|---|---|
@@ -49,13 +50,16 @@ similarity score, confidence, or candidate rank.
 | ALOS World 3D-30m DSM (30 m) | independent DEM | same statistics against Copernicus |
 | IO 10 m Annual LULC V2 | land-cover cross-check | broad-class total-variation agreement with ESA WorldCover, with years and taxonomies recorded |
 | Sentinel-2 L2A and Landsat C2 L2 | optical context | recent scenes, cloud cover, platform, STAC item link, unsigned preview |
+| Meteomatics weather (credentialed) | operational weather context | 48-hour point forecast: temperature, wind speed/direction, humidity, sampled precipitation, and cloud cover |
 
 DEM statistics are computed only on cells valid in both products. Vertical datums and acquisition
 epochs differ, so the statistics are a product-agreement check, not an accuracy assessment.
 Land-cover agreement maps both legends to broad classes before comparing distributions; the
 products use different class definitions and epochs, so disagreement is reported rather than
 resolved by preference. Planetary Computer data access uses public STAC metadata and automatic
-short-lived SAS tokens; tokens are never persisted.
+short-lived SAS tokens; tokens are never persisted. Meteomatics uses HTTP Basic authentication,
+and neither the account identity nor the password is written to evidence, manifests, reports, or
+logs. Weather values are forecast model output, not in-situ measurements.
 
 Absolute elevation is not compared across bodies. Earth uses an orthometric datum, the Moon uses a
 sphere-referenced radius, and Mars uses the MOLA areoid. The elevation **distribution** feature is

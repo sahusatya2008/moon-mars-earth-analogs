@@ -301,4 +301,4 @@ def test_planetary_computer_collections_are_registered_and_context_only():
         assert spec["source_url"].endswith(f"/collections/{collection}")
         assert spec["citation"]
         assert spec["license"]
-    assert CATALOG_VERSION == "0.3.0"
+    assert CATALOG_VERSION == "0.4.0"

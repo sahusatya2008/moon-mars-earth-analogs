@@ -1,8 +1,9 @@
 # TERRA-X Verification Report
 
-**Executed:** 2026-11-13 (local session); Planetary Computer and container checks 2026-11-14
+**Executed:** 2026-11-13 (local session); Planetary Computer, Meteomatics, and container checks
+2026-11-14
 
-**Version:** algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.3.0`
+**Version:** algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.4.0`
 
 **Environment:** macOS, Python 3.12 virtualenv, Node 22, PostgreSQL/PostGIS on `localhost:5434`,
 FastAPI on `:8000`, one worker, Next.js on `:3000`; Docker Compose end-to-end on `15434`/`18000`/`13000`.
@@ -15,12 +16,12 @@ without a command and observed result.
 
 | Check | Command | Observed result |
 |---|---|---|
-| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **68 passed, 3 warnings** |
+| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **76 passed, 3 warnings** |
 | Backend lint | `.venv/bin/ruff check terrax tests` | **All checks passed** |
 | Frontend types | `npm run typecheck` | **Passed** (`tsc --noEmit`, no diagnostics) |
 | Frontend production build | `npm run build` | **Passed**; `/`, `/analyses`, `/terrain`, `/datasets`, `/methodology`, and dynamic `/analyses/[id]` emitted |
 | Compose syntax | `docker compose config` | **Exit 0**, rendered configuration accepted |
-| Docker image build | `docker compose ... build` | **Passed**; API **189 MB**, worker **189 MB**, web **77.5 MB** (catalog-0.3.0 rebuild) |
+| Docker image build | `docker compose ... build` | **Passed**; API **189 MB**, worker **189 MB**, web **77.5 MB** (catalog-0.4.0 rebuild) |
 | Compose end-to-end | isolated-port stack + `verify_compose.py` | **All checks passed** (see 1.1) |
 
 The three warnings are non-failing:
@@ -41,7 +42,7 @@ degenerate mesh, and route validation for unsupported bodies, invalid coordinate
 footprints. The report tests assert that GeoJSON does not apply a collection-wide Earth CRS to
 Moon/Mars features. Config tests assert that the repository root resolves correctly in both the
 checkout layout (`<repo>/apps/api/terrax/config.py`) and the container layout
-(`/app/terrax/config.py`). The observed count in this session was **68 passed**.
+(`/app/terrax/config.py`). The observed count in this session was **76 passed**.
 
 Twelve dedicated Planetary Computer tests cover SAS signing restricted to Azure blob hosts,
 token redaction, cached token refresh, antimeridian splitting and item de-duplication, DEM
@@ -50,9 +51,16 @@ agreement, optical search retry without a cloud filter, probe states, and regist
 five collections as Earth context-only datasets. These use synthetic HTTP/raster fixtures; live
 Planetary Computer access is reported separately in 1.2 and 2.4.
 
+Eight dedicated Meteomatics tests cover the documented URL path, HTTP Basic auth, multiple
+locations, optional query parameters, forecast summary statistics including circular wind
+direction, response caching, credential rejection, API parameter errors, probe states, and
+registration as a context-only dataset. The tests assert that the response `user` field and the
+configured username/password never appear in connector output. These use mocked HTTP; live access
+is reported in 1.3 and 2.5.
+
 ### 1.1 Containerized Compose run (2026-11-14)
 
-The catalog-0.3.0 stack was rebuilt from the committed Dockerfiles with a fresh PostGIS volume.
+The catalog-0.4.0 stack was rebuilt from the committed Dockerfiles with a fresh PostGIS volume.
 Images measured: API **189 MB**, worker **189 MB**, web **77.5 MB** (uncompressed arm64 images).
 `rasterio`'s manylinux wheel links `libexpat.so.1`, which `python:3.12-slim` omits, so the API
 runtime stage installs `libexpat1`; `python -c "import terrax.main"` succeeds inside the image
@@ -60,21 +68,28 @@ with `REPO_ROOT=/app`.
 
 The stack used isolated host ports—PostGIS `15434`, API `18000`, web `13000`—so an existing local
 development stack on `5434`/`8000`/`3000` stayed untouched. Its database volume was empty before
-the run. An earlier build (catalog 0.2.0, 16 datasets, analysis
-`cf632ae1-7ee5-499c-af80-16e686a0d97e`) passed the same checks; this rerun supersedes it.
+the run. Earlier builds (catalog 0.2.0 and 0.3.0) passed the same checks; this rerun supersedes
+them.
 
 | Check | Observed result |
 |---|---|
-| Startup | initial migration `0697627b9ac4` applied; seed logged `{'planets': 3, 'datasets': 21, 'regions': 9}`; API became healthy |
-| Catalog | `/health` returned `status=ok`, `database=ok`, version `0.3.0`, **21** datasets, **9** regions |
-| Web | landing returned HTTP 200 and contained the non-affiliation notice; headless Chrome rendered **21** catalog products and the Planetary Computer evidence panel |
+| Startup | initial migration `0697627b9ac4` applied; seed logged `{'planets': 3, 'datasets': 22, 'regions': 9}`; API became healthy |
+| Catalog | `/health` returned `status=ok`, `database=ok`, version `0.4.0`, **22** datasets, **9** regions, `meteomatics_configured: true` |
+| Web | landing returned HTTP 200, rendered v0.4 with **22** authoritative datasets and the non-affiliation notice; headless Chrome on the container workspace rendered **9** evidence records including the Planetary Computer previews and the Meteomatics weather insight |
 | Moon terrain | `lro_lola_ldem_128ppd`, 80×80, **6,400/6,400** valid, −2,548.0 to −560.5 m |
 | Mars terrain | `mgs_mola_megdr_463m`, 80×80, **6,400/6,400** valid, −3,444.4 to 761.0 m |
 | Earth terrain | `copernicus_dem_glo30`, 80×80, **6,400/6,400** valid, 1,234.1 to 2,476.6 m |
-| Analysis | `82edb848-423c-4d73-a418-f4d16366f3b1` succeeded through the containerized worker; **3** candidates; top **Provincia de Antofagasta, Antofagasta Region, Chile**, similarity **0.734385**, confidence **0.700000** (moderate); **no context errors** |
-| Planetary Computer | containerized worker attached NASADEM (MAE **0.8688 m**), ALOS (MAE **2.0044 m**), IO LULC (agreement **0.23266**), Sentinel-2 (cloud **0.500184%**), and Landsat (cloud **9.14%**); unsigned previews rendered in the web container |
-| Reports | JSON, manifest, GeoJSON, CSV, and PDF all `ready`; downloaded SHA-256 matched; no `sig=` or `<sas>` leak |
-| GeoJSON | report `7e614407-9bd6-412f-8d84-77d3314b3d0c`, 6,015 bytes, no collection-wide `crs`, **4** features with `spatial_reference` |
+| Analysis | `6965dd2a-6462-46a3-8e1a-78dea3153af7` succeeded through the containerized worker; **3** candidates; top `602bdf71-1f57-4f69-a1cc-050fbfdc5f51` · **Provincia de Antofagasta, Antofagasta Region, Chile**, similarity **0.734385**, confidence **0.700000** (moderate); **no context errors** |
+| Planetary Computer | containerized worker attached NASADEM (MAE **0.8688 m**), ALOS (MAE **2.0044 m**), IO LULC (agreement **0.23266**), Sentinel-2 (cloud **0.676448%**), and Landsat (cloud **9.14%**); workspace rendered both unsigned preview images |
+| Meteomatics | containerized worker attached weather evidence for all **3** candidates; the top candidate recorded mean **20.66 °C**, max wind **7.4 m/s**, mean cloud **14.37%**, humidity **26.21%**, and sampled precipitation **0.0 mm** at `25.30°S, 69.90°W` |
+| Reports | JSON, manifest, GeoJSON, CSV, and PDF all `ready`; downloaded SHA-256 matched; no `sig=`, `<sas>`, Meteomatics username, or password leak |
+| GeoJSON | report `8275bf91-706d-48aa-8d69-c52a933e6dc3`, 6,015 bytes, no collection-wide `crs`, **4** features with `spatial_reference` |
+
+Container report IDs: JSON `4056c6cc-fe1c-446c-9919-a2f351900ff1`, manifest
+`b63f271b-3020-4015-a72f-60642a1be0ed`, GeoJSON `8275bf91-706d-48aa-8d69-c52a933e6dc3`, CSV
+`148963a0-9b4a-481d-8f26-68acb13a4724`, PDF `36794dd1-dbdb-4759-a16c-bceff2ad755a`. The JSON
+export contains `meteomatics_weather`; GeoJSON, CSV, and PDF are candidate-summary exports and do
+not.
 
 The worker made live network requests during the run: Planetary Computer STAC, SAS signing, and
 signed window reads succeeded; Earth Search and NASA GIBS also returned HTTP 200. The API and
@@ -101,6 +116,28 @@ test site (`25.0°S, 70.2°W`, 40 km):
 (`firms_viirs`), 0 unavailable**. The gated service was not reported as connected. API and worker
 logs, and all report exports from the run below, were searched for `sig=` and `<sas>`; no token or
 signed query string was found.
+
+### 1.3 Live Meteomatics connector checks (2026-11-14)
+
+The Meteomatics username and password were supplied through the gitignored `.env`; the API health
+response reported `meteomatics_configured=true`. No credential was written to the repository.
+
+| Check | Observed result |
+|---|---|
+| Probe | `POST /api/v1/datasets/probe?dataset_id=meteomatics_weather` returned `available`, HTTP **200**, latency **965 ms** |
+| Full catalog | `POST /api/v1/datasets/probe?limit=100` returned **21 available, 1 credential-gated (`firms_viirs`), 0 unavailable** |
+| Point forecast | `25.30°S, 69.90°W`, 48 h from `2026-11-14T07:00:00Z` at 3-hour steps, **17** samples |
+| Temperature | mean **20.66 °C**, min **13.8 °C**, max **27.5 °C** |
+| Wind | mean **3.15 m/s**, max **7.4 m/s**, circular mean direction **136.3°** |
+| Humidity / cloud | mean humidity **26.21%**; mean cloud **14.37%**, range 0.0-74.2% |
+| Precipitation | no sampled precipitation in the 48 h window |
+| Credential handling | the API response `user` field is discarded; the connector output and all report exports contained neither the account username nor the password |
+| Log scan | API and worker logs were searched for the username, password, and `Basic `; **0** matches |
+
+The connector calls the documented path
+`/{validdatetime}/{parameters}/{locations}/{format}` with HTTP Basic authentication. Missing
+credentials produce `requires_credentials`; invalid credentials also produce
+`requires_credentials` rather than `available`.
 
 ## 2. Completed scientific runs
 
@@ -230,6 +267,46 @@ DEMs agree closely with Copernicus in this window, but that is an independent cr
 vertical datums, acquisition epochs, and surface definitions differ, so it is not a product
 accuracy assessment.
 
+### 2.5 Meteomatics weather run — Aristarchus Plateau
+
+This run exercised catalog 0.4.0 through the local API and worker, adding credentialed
+Meteomatics weather evidence to the Planetary Computer cross-checks.
+
+| Field | Value |
+|---|---|
+| Analysis ID | `f541712c-5000-4dc2-a6f3-f1a7db59fe0f` |
+| Title | Meteomatics live verification |
+| Reference | Aristarchus Plateau, Moon, `25.40°N, 47.40°W` |
+| Footprint / grid | 40 km / 500 m |
+| Earth search bbox | `[-70.5, -25.5, -68.5, -23.5]`, seed 42, `refine_top_n` 5 |
+| Status | `succeeded`, progress 1.0, **no context errors** |
+| Manifest | catalog `0.4.0`, **11** datasets: 2 scoring DEMs and 9 context/evidence products |
+| Context datasets | ESA WorldCover, IO LULC, NASADEM, ALOS, **Meteomatics**, NASA GIBS, Nominatim, PC Sentinel-2, PC Landsat |
+
+| Rank | Candidate ID | Center | Similarity | Confidence | Band | Coverage |
+|---:|---|---|---:|---:|---|---:|
+| 1 | `b2fdcc4c-5ef0-4c96-a4b0-fa074ebdcec0` | `25.30°S, 69.90°W` | **0.734385** | 0.700000 | moderate | 1.0 |
+| 2 | `c453026f-8d95-4ae1-9fc6-0387d3b0dfcd` | `24.10°S, 68.70°W` | 0.651816 | 0.700000 | moderate | 1.0 |
+| 3 | `c06775e7-6fba-4c22-9a9c-39c1d0903d59` | `23.70°S, 69.90°W` | 0.641907 | 0.550000 | moderate | 1.0 |
+
+Scores are identical to run 2.4 because the search configuration and seed are the same; the new
+product adds evidence only and does not change the ranking. Stored weather evidence for the top
+candidate:
+
+| Field | Observed result |
+|---|---|
+| Window | `2026-11-14T07:00:00Z` to `2026-11-16T07:00:00Z`, 3-hour steps, **17** samples, UTC |
+| Temperature | mean **20.66 °C**, min **13.8 °C**, max **27.5 °C** |
+| Wind | mean **3.15 m/s**, max **7.4 m/s**, circular mean direction **136.3°** |
+| Humidity | mean **26.21%** |
+| Cloud | mean **14.37%**, min **0.0%**, max **74.2%** |
+| Precipitation | sampled maximum **0.0 mm**; sampled sum **0.0 mm** |
+| Role | operational weather context, **not scored** |
+
+The run's JSON and manifest exports contain `meteomatics_weather`; the GeoJSON, CSV, and PDF are
+candidate-summary exports and do not. None of the five downloads, nor the API/worker logs,
+contained the Meteomatics username or password.
+
 ## 3. Report exports
 
 Five reports were generated for the canonical Moon run and downloaded again for independent
@@ -265,6 +342,22 @@ The GeoJSON has **4** features and **no top-level `crs`**; its per-feature `body
 `earth` and `moon`. The JSON export contains the NASADEM/ALOS statistics, IO LULC agreement,
 Sentinel-2/Landsat scene metadata, and unsigned preview URLs, but no signed query parameter.
 
+### 3.2 Meteomatics run exports
+
+Five reports were generated for analysis `f541712c-5000-4dc2-a6f3-f1a7db59fe0f`, re-downloaded,
+and checked for checksum integrity and credential leakage.
+
+| Format | Report ID | Bytes | SHA-256 (downloaded bytes) | Check |
+|---|---|---:|---|---|
+| JSON | `a4fe34a1-dcde-433e-bab5-668d81747e76` | 171,637 | `15e3f36b9a339f1df7ed5b9f94626f45cd64e22195881bf9650ff081603d56ed` | match · no username · no password · weather present |
+| Manifest | `3e503f06-e818-4a8a-8dea-cbe755397bdd` | 127,143 | `e07dd6e01f9bc0694bb894d5b810081a4ae83a19717ea21d202f6957f14385ef` | match · no username · no password · weather present |
+| GeoJSON | `a0ed4e46-a6e3-4c91-ad84-46944a84bfba` | 6,015 | `70a3523aee48352d7f31d3f2ea5b0132ba2c09a63881ea6cb395d1d8ab5cc4e5` | match · no username · no password · 4 features · no top-level `crs` |
+| CSV | `aaf8fc22-ec80-4a2e-99f5-818e72e73816` | 1,832 | `e17109a37d183d6c867166769aad6bb2e38932991d355d219bdf6c3a5ccee4a4` | match · no username · no password |
+| PDF | `0326cb2b-edbe-494c-af5f-552ef58dd841` | 11,116 | `976dc45d29377a481febf7ed25b706aef0ddc5e487b941e31e7230acda52ab02` | match · no username · no password |
+
+All five downloads matched their stored SHA-256, and the connector's response `user` field was
+not persisted.
+
 ## 4. Assistant
 
 `POST /api/v1/assistant/query` was run against the canonical Moon analysis with the question
@@ -294,8 +387,9 @@ The running production build was inspected through headless Chrome at 1600 px wi
 | Report panel | 5 ready formats and 5 download links; downloads checksum-verified |
 | Assistant | Cited answer renders with 6 citations |
 | SSE progress | Live stage/progress/events render; terminal transition succeeds |
-| Data observatory | **21** products render (**15 Earth, 3 Moon, 3 Mars**), including all five Planetary Computer collections; catalog filter, scoring-input filter, body groups, and live probe controls render |
-| Planetary Computer evidence | Top candidate shows **8** evidence records, including NASADEM/ALOS DEM metrics, IO LULC agreement, and Sentinel-2/Landsat scene context; unsigned preview `<img>` URLs load HTTP 200 `image/png` |
+| Data observatory | **22** products render (**16 Earth, 3 Moon, 3 Mars**), including all five Planetary Computer collections and credential-gated Meteomatics; catalog filter, scoring-input filter, body groups, and live probe controls render |
+| Planetary Computer evidence | Top candidate shows NASADEM/ALOS DEM metrics, IO LULC agreement, and Sentinel-2/Landsat scene context; unsigned preview `<img>` URLs load HTTP 200 `image/png` |
+| Meteomatics evidence | Top candidate shows **9** evidence records including `meteomatics_weather`; the panel renders mean 20.7 °C, wind max 7.4 m/s, sampled precipitation 0.0 mm, mean cloud 14%, humidity 26%, with an explicit forecast-only, not-scored caveat |
 | Methodology | Declared formulas, weights, tolerances, and limitations render |
 | Missing WebGL | Globe shows the real equirectangular source texture and an explicit fallback label |
 | 3D globe (SwiftShader) | Landing and workspace globes render the real NASA Earth texture, candidate pin, and body tabs; **no console errors** |
@@ -313,8 +407,8 @@ A second instance launched with SwiftShader software WebGL (`--use-gl=angle
 workspace, with **no console errors** in either capture. Drag/zoom interaction was not scripted;
 the render path itself is verified. A hardware-GPU browser was not available.
 
-The Planetary Computer UI pass used the default headless instance. `/datasets` rendered all 21
-catalog rows and the SAS-access explanation. Workspace
+The Planetary Computer UI pass used the default headless instance. `/datasets` rendered all 22
+catalog rows, the SAS-access explanation, and the credential-gated weather note. Workspace
 `/analyses/58500974-41e1-4649-9a0a-adcb9f4f126e` auto-selected the top candidate and rendered:
 
 - ALOS cross-check: **MAE 2.00 m**, RMSE 2.13 m, bias +2.00 m across 6,400 cells;
@@ -323,6 +417,12 @@ catalog rows and the SAS-access explanation. Workspace
 - Landsat: cloud **9.1%**, 3 scenes, `landsat-9`;
 - Sentinel-2: cloud **0.5%**, 3 scenes, `Sentinel-2B`;
 - both unsigned preview URLs returned HTTP 200 `image/png` (2,184,434 and 1,204,885 bytes).
+
+Workspace `/analyses/f541712c-5000-4dc2-a6f3-f1a7db59fe0f` then rendered the weather record
+stored by run 2.5:
+
+- `Weather context: mean 20.7 °C, wind max 7.4 m/s, sampled precipitation 0.0 mm, mean cloud
+  14%, humidity 26%. Model forecast, not an in-situ measurement; not scored.`
 
 The rendered metrics and previews came from persisted evidence records, not client-side
 recomputation.
@@ -374,15 +474,17 @@ Screenshots in `docs/media/` were captured from these running services:
 - `landing.png`, `terrain.png`, `datasets.png`, `methodology.png`, `workspace.png`,
   `progress.png`.
 
-`landing.png` is the SwiftShader render with the real Earth texture, **21** datasets, 9 reference
-regions, 10 stored analyses, the latest Planetary Computer Aristarchus run (top similarity
-0.734), and the start of the real 3D terrain section. `datasets.png` shows the 21-product catalog
-and the Planetary Computer access note. `methodology.png` shows methodology version 0.3.0 with the
-persisted 58500974 configuration. `workspace.png` is the Planetary Computer run with the
-four-surface 3D terrain panel, five ready reports, all three candidates, and the NASADEM/ALOS and
-IO LULC evidence metrics. `terrain.png` is the `/terrain` explorer showing all **17** surfaces
-(8 Earth, 4 Moon, 5 Mars) and a real Earth Copernicus mesh. `progress.png` is the canonical run
-mid-execution at 10%, showing `RUNNING`, not an error.
+`landing.png` is the SwiftShader render with the real Earth texture, **22** datasets, 9 reference
+regions, 11 stored analyses, the latest Meteomatics Aristarchus run (top similarity 0.734), and the
+start of the real 3D terrain section. `datasets.png` shows the 22-product catalog, the Planetary
+Computer access note, credential-gated Meteomatics, and the probe chips **21 available / 1 gated /
+0 unknown**. `methodology.png` shows methodology version 0.4.0 with the persisted `f541712c`
+configuration and the weather-context statement. `workspace.png` is the Meteomatics run with the
+four-surface 3D terrain panel, five ready reports, all three candidates, the weather insight, and
+the NASADEM/ALOS and IO LULC evidence metrics. `terrain.png` is the `/terrain` explorer showing
+all **17** surfaces (8 Earth, 4 Moon, 5 Mars), a real Earth Copernicus mesh, and candidate labels
+from the Meteomatics run. `progress.png` is the canonical run mid-execution at 10%, showing
+`RUNNING`, not an error.
 
 ### 5.3 Terrain fallback and GeoJSON integrity fixes
 
@@ -425,9 +527,10 @@ These are deliberately unresolved rather than hidden:
    mount, runs the API and worker as root, has no TLS or resource limits, and was not exercised
    under load. The CI workflow is committed and YAML-validated but has not executed on GitHub
    because no remote is configured.
-2. **No credential-gated live checks.** `NASA_EARTHDATA_TOKEN` and `NASA_FIRMS_MAP_KEY` were not
-   configured. `/health` reports `earthdata_configured: false`; affected catalog rows report
-   `requires_credentials`, not “connected”.
+2. **Some credential-gated sources remain unexercised.** Meteomatics was exercised live with its
+   configured account, but `NASA_EARTHDATA_TOKEN` and `NASA_FIRMS_MAP_KEY` were not configured.
+   `/health` reports `earthdata_configured: false` and `meteomatics_configured: true`; the
+   unconfigured rows report `requires_credentials`, not “connected”.
 3. **No LLM provider was exercised.** Only the deterministic grounded narrator was tested.
 4. **No Redis path was exercised.** Redis is optional and unused by the default Postgres queue.
 5. **Large NASA/PDS archives were not downloaded.** The delivery network ran at roughly 100 KB/s;

@@ -7,7 +7,7 @@ real access URL, citation, licence, and whether it contributes to scoring.
 
 from __future__ import annotations
 
-CATALOG_VERSION = "0.3.0"
+CATALOG_VERSION = "0.4.0"
 
 PLANETS = [
     {
@@ -480,6 +480,43 @@ DATASETS = [
         "processing_level": "L2",
         "requires_credentials": True,
         "credential_env_var": "NASA_FIRMS_MAP_KEY",
+        "status": "requires_credentials",
+        "is_scoring_input": False,
+    },
+    {
+        "id": "meteomatics_weather",
+        "title": "Meteomatics weather and forecast",
+        "body_id": "earth",
+        "source_agency": "Meteomatics AG",
+        "mission": "Meteomatics Weather API",
+        "instrument": "Multi-model numerical weather prediction blend",
+        "description": (
+            "Point forecasts of temperature, wind, humidity, precipitation, and cloud cover "
+            "assembled from a blend of numerical weather models with model-dependent "
+            "resolution (typically 1-11 km). Requires account credentials; provides "
+            "operational and atmospheric context for candidate sites and is never a score "
+            "input."
+        ),
+        "variable_names": [
+            "air_temperature",
+            "wind_speed",
+            "wind_direction",
+            "relative_humidity",
+            "precipitation",
+            "cloud_cover",
+        ],
+        "access_protocol": "HTTPS REST API, HTTP Basic authentication",
+        "source_url": "https://www.meteomatics.com/en/weather-api/",
+        "documentation_url": "https://www.meteomatics.com/en/api/available-parameters/",
+        "citation": "Meteomatics AG, Meteomatics Weather API, accessed through a credentialed account.",
+        "license": "Meteomatics API terms (subscription)",
+        "license_url": "https://www.meteomatics.com/en/terms-and-conditions/",
+        "spatial_resolution_m": 1000.0,
+        "temporal_resolution": "hourly to 3-hourly forecast steps",
+        "temporal_coverage": "forecast and subscription-dependent history",
+        "processing_level": "model output / L4",
+        "requires_credentials": True,
+        "credential_env_var": "METEOMATICS_USERNAME",
         "status": "requires_credentials",
         "is_scoring_input": False,
     },

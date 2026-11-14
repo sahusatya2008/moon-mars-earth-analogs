@@ -87,7 +87,7 @@ docker compose up --build
 - PostGIS: `localhost:5434`
 
 The API container applies migrations and idempotently seeds the catalog before starting, so a fresh
-volume comes up with all 21 datasets and 9 preset regions. The worker waits for API health, then
+volume comes up with all 22 datasets and 9 preset regions. The worker waits for API health, then
 claims jobs. An optional Redis profile exists but is not used by the default queue.
 
 ## Local development
@@ -127,6 +127,7 @@ All configuration is environment-based; see `.env.example`. The core path needs 
 | `TERRAX_CORS_ORIGINS` | explicit browser origins; localhost, 127.0.0.1, and ::1 on any port are allowed by default |
 | `NASA_EARTHDATA_TOKEN` | optional, for authenticated Earthdata products |
 | `NASA_FIRMS_MAP_KEY` | optional fire context |
+| `METEOMATICS_USERNAME`, `METEOMATICS_PASSWORD` | optional, credentialed weather context |
 | `TERRAX_LLM_*`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | optional assistant provider; the deterministic grounded narrator works without any |
 | `TERRAX_ADMIN_API_KEY` | optional protection for admin endpoints |
 
@@ -208,14 +209,16 @@ USGS Astrogeology LRO LOLA and MGS MOLA, Copernicus DEM GLO-30, AWS Terrain Tile
 (Mapzen/Tilezen), NASA GIBS and CMR, ESA WorldCover, Sentinel-2 L2A via Earth Search, OpenStreetMap
 Nominatim, and optional NASA FIRMS. Microsoft Planetary Computer adds NASADEM HGT v001, ALOS
 World 3D-30m, Impact Observatory annual LULC V2, Sentinel-2 L2A, and Landsat Collection 2 Level-2.
-Every catalog entry carries its own agency, citation, license, resolution, access protocol, and
-live-availability state.
+Optional Meteomatics weather adds a 48-hour point forecast (temperature, wind, humidity,
+precipitation, and cloud cover) as operational context. Every catalog entry carries its own
+agency, citation, license, resolution, access protocol, and live-availability state.
 
 Planetary Computer raster assets are private Azure blobs. TERRA-X obtains a short-lived public SAS
 token per collection, appends it only for `*.blob.core.windows.net` reads, and never writes signed
 URLs or tokens to evidence, manifests, reports, or logs. The STAC metadata and unsigned preview
-links remain public and citable. These collections are cross-checks and optical context; Copernicus
-GLO-30 remains the only Earth DEM used for scoring.
+links remain public and citable. Meteomatics uses HTTP Basic authentication from the environment;
+the account username and password are never persisted. These products are cross-checks, optical
+context, and weather context; Copernicus GLO-30 remains the only Earth DEM used for scoring.
 
 The delivery environment reaches these archives at roughly 100 KB/s. The design therefore reads
 windows and small ranges, caches them, and avoids bulk downloads. Large archives and credential-
@@ -230,10 +233,11 @@ marks, and nothing in this repository implies endorsement by those agencies.
 
 ## Verification
 
-Executed on 2026-11-13, with the Planetary Computer and container checks run on 2026-11-14:
+Executed on 2026-11-13, with the Planetary Computer, Meteomatics, and container checks run on
+2026-11-14:
 
-- backend: **68 passed**, 3 non-failing warnings, including 12 dedicated Planetary Computer tests;
-  Ruff clean;
+- backend: **76 passed**, 3 non-failing warnings, including 12 Planetary Computer and 8 Meteomatics
+  tests; Ruff clean;
 - frontend: TypeScript clean and production build passed, including `/terrain`;
 - canonical Moon run `0f81536a-fd92-4e90-80be-558679889b59`: 68 coarse samples, 3/3 refinements
   succeeded, 3 candidates, top similarity **0.789007** with **0.904513** high confidence;
@@ -242,8 +246,12 @@ Executed on 2026-11-13, with the Planetary Computer and container checks run on 
   cross-checked Copernicus over 6,400/6,400 cells (MAE **0.8688 m** and **2.0044 m**); IO LULC
   agreement with WorldCover was **0.23266** and is reported as disagreement; Sentinel-2 and
   Landsat returned 3 scenes each (cloud **0.500184%** and **9.14%**);
-- live Planetary Computer probes: all five collections `available`; catalog probe returned
-  **20 available, 1 credential-gated, 0 unavailable**;
+- live Planetary Computer probes: all five collections `available`; full catalog probe returned
+  **21 available, 1 credential-gated, 0 unavailable**;
+- Meteomatics weather was exercised against the live credentialed API: the probe returned
+  `available` (HTTP 200); a 48-hour forecast at the Atacama test site returned 17 samples with
+  mean temperature **20.66 °C**, max wind **7.4 m/s**, and mean cloud **14.37%**. The account
+  username and password were absent from connector output, evidence, and all report exports;
 - five reports generated for the Planetary Computer run, re-downloaded, and SHA-256 matched; no
   `sig=` or `<sas>` appeared in any export or in API/worker logs;
 - 3D terrain: 2 landing meshes, 4 workspace surfaces, and **17** distinct surfaces in `/terrain`
@@ -258,12 +266,13 @@ Executed on 2026-11-13, with the Planetary Computer and container checks run on 
   software-WebGL globe and terrain renders;
 - **containerized stack verified**: API, worker, and web images built from the committed
   Dockerfiles (189 MB, 189 MB, 77.5 MB); a fresh PostGIS volume applied migrations and
-  auto-seeded **21 datasets** and 9 regions; the API became healthy at version `0.3.0`; Moon,
-  Mars, and Earth terrain requests each returned 80×80 real DEM cells; analysis
-  `82edb848-423c-4d73-a418-f4d16366f3b1` ran through the containerized worker to 3 candidates
-  (top similarity **0.734385**, confidence **0.700000**) with NASADEM/ALOS/LULC/Sentinel-2/Landsat
-  evidence; all five reports matched their checksums and GeoJSON report
-  `7e614407-9bd6-412f-8d84-77d3314b3d0c` had no collection-wide CRS and per-feature spatial
+  auto-seeded **22 datasets** and 9 regions; the API became healthy at version `0.4.0` with
+  `meteomatics_configured: true`; Moon, Mars, and Earth terrain requests each returned 80×80 real
+  DEM cells; analysis `6965dd2a-6462-46a3-8e1a-78dea3153af7` ran through the containerized worker
+  to 3 candidates (top similarity **0.734385**, confidence **0.700000**) with
+  NASADEM/ALOS/LULC/Sentinel-2/Landsat and Meteomatics weather evidence; all five reports matched
+  their checksums, no export contained the Meteomatics username or password, and GeoJSON report
+  `8275bf91-706d-48aa-8d69-c52a933e6dc3` had no collection-wide CRS and per-feature spatial
   references. The run used isolated ports `15434`/`18000`/`13000`.
 - the CI workflow is committed and YAML-validated but has not executed on GitHub (no remote
   configured).

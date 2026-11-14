@@ -12,7 +12,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...catalog import dataset_map
-from ...connectors import copernicus_dem, gibs, planetary_computer, trek, worldcover
+from ...connectors import (
+    copernicus_dem,
+    gibs,
+    meteomatics,
+    planetary_computer,
+    trek,
+    worldcover,
+)
 from ...connectors.http import head
 from ...connectors.stac import SEARCH
 from ...models import DatasetCollection, PlanetaryBody
@@ -147,6 +154,9 @@ def probe_dataset(dataset_id: str) -> DatasetAvailability:
     elif dataset_id == "nasa_cmr":
         probe_url = "https://cmr.earthdata.nasa.gov/search/collections.json?page_size=1"
         status, detail, http_status = _probe_head(probe_url)
+    elif dataset_id == "meteomatics_weather":
+        status, detail, http_status = meteomatics.probe()
+        probe_url = meteomatics.BASE
     elif dataset_id == "firms_viirs":
         from ...config import get_settings
 

@@ -112,13 +112,15 @@ export default async function MethodologyPage() {
     <main className="shell" style={{ padding: "34px 0 70px" }}>
       <div className="section-head">
         <div>
-          <div className="eyebrow">Methodology · version 0.3.0</div>
+          <div className="eyebrow">Methodology · version 0.4.0</div>
           <h2>Transparent by construction</h2>
           <p style={{ marginTop: 10, maxWidth: 820 }}>
             TERRA-X measures terrain, not appearances. The reference window and each Earth
             candidate are reduced to the same physical footprint and grid before any comparison.
             Similarity and confidence are computed separately, every tolerance is declared in
-            advance, and unavailable evidence stays visible as unavailable.
+            advance, and unavailable evidence stays visible as unavailable. Weather context from
+            Meteomatics is reported beside candidate evidence when credentials are configured; it
+            never enters the similarity score or confidence.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -239,8 +241,9 @@ export default async function MethodologyPage() {
             <div>
               <div className="eyebrow">Evidence-only dimensions</div>
               <p className="small muted" style={{ lineHeight: 1.65 }}>
-                Surface albedo, thermal inertia, water/ice indicators, aeolian context, and
-                environmental setting are not scored cross-body. Their products are not
+                Surface albedo, thermal inertia, water/ice indicators, aeolian context,
+                environmental setting, and credentialed weather context are not scored
+                cross-body. Their products are not
                 physically comparable at a common scale, or no authoritative product pair exists
                 for the reference and candidate. They remain in the catalog and can appear as
                 context evidence, never as a hidden similarity term.
