@@ -107,6 +107,40 @@ checked before startup; the runner only stops processes whose working directory 
 Use `--skip-install` or `--skip-build` with `run`/`restart` to reuse existing dependencies or the
 current production build, and `--open` to open the web app after a successful start.
 
+## Public hosting (optional)
+
+`./run.sh public` publishes the running stack on its own
+`https://<random>.trycloudflare.com` URL through a Cloudflare Quick Tunnel. It does not use,
+reconfigure, or expose Tailscale, and it does not touch any other site on the machine.
+
+```bash
+./run.sh public --open   # publish and open the public URL
+./run.sh status          # prints the current public URL
+./run.sh unpublish       # close the tunnel and invalidate the URL
+```
+
+The FastAPI service stays bound to loopback. The browser reaches it through the same-origin
+Next.js proxy at `/api/v1/[...path]`, so there is no second public port and no CORS bypass. The
+proxy forwards REST, SSE, terrain, textures, previews, Evidence Q&A, and report downloads, and it
+refuses everything except `GET`, `HEAD`, `POST`, and `OPTIONS`. It also blocks `/admin/*`,
+`DELETE`, `POST /regions`, and `*/cancel`, and applies per-IP write rate limits.
+
+Important operational details:
+
+- The Mac must stay powered on, awake, and online while the tunnel runs; the app is not deployed
+  anywhere else.
+- The public URL has **no login**. Anyone who has it can create analyses and download reports.
+  Do not share it more widely than necessary, and run `./run.sh unpublish` when it is no longer
+  needed.
+- `scripts/public-tunnel.sh` supervises `cloudflared`, restarts it if it exits, and republishes the
+  new URL to `.run/public-url.txt`. The hostname changes whenever `cloudflared` restarts.
+- Quick Tunnels buffer `text/event-stream` responses. SSE remains correct on localhost and through
+  streaming-capable tunnels, and the analysis workspace also polls stored job state every two
+  seconds, so live progress still advances on the public URL.
+- `TERRAX_API_BASE_URL` is the private server-side API base used by Next.js and the proxy. Leave
+  `NEXT_PUBLIC_API_URL` blank for same-origin browser requests.
+- `cloudflared` is installed automatically with Homebrew when missing.
+
 ## Quick start (Docker)
 
 Requires Docker with Compose. No scientific credentials are needed for the core workflow.
@@ -157,8 +191,8 @@ All configuration is environment-based; see `.env.example`. The core path needs 
 |---|---|
 | `DATABASE_URL` | SQLAlchemy DSN; PostGIS is required |
 | `TERRAX_DATA_DIR`, `TERRAX_CACHE_DIR`, `TERRAX_REPORT_DIR` | writable data roots |
-| `NEXT_PUBLIC_API_URL` | browser-facing API base |
-| `TERRAX_API_BASE_URL` | server-rendered Next.js API base (Compose uses `http://api:8000`) |
+| `NEXT_PUBLIC_API_URL` | browser-facing API base; leave blank to use the same-origin `/api/v1` proxy |
+| `TERRAX_API_BASE_URL` | private Next.js/proxy API base (Compose uses `http://api:8000`) |
 | `TERRAX_CORS_ORIGINS` | explicit browser origins; localhost, 127.0.0.1, and ::1 on any port are allowed by default |
 | `NASA_EARTHDATA_TOKEN` | optional, for authenticated Earthdata products |
 | `NASA_FIRMS_MAP_KEY` | optional fire context |
@@ -316,6 +350,15 @@ Executed on 2026-11-13, with the Planetary Computer, Meteomatics, and container 
   their checksums, no export contained the Meteomatics username or password, and GeoJSON report
   `8275bf91-706d-48aa-8d69-c52a933e6dc3` had no collection-wide CRS and per-feature spatial
   references. The run used isolated ports `15434`/`18000`/`13000`.
+- **public hosting verified (Cloudflare Quick Tunnel)**: the site was served at a separate
+  `https://<random>.trycloudflare.com` URL while `https://leou.tailabe1e6.ts.net` on port 443
+  remained untouched; the same-origin proxy passed health, 22 datasets, analyses, results,
+  candidate detail, event log, Evidence Q&A, comparison, Copernicus terrain, Earth texture,
+  preview, and a branded `snsx-space-7391ae5e.pdf` report; admin, `DELETE`, and cancel requests
+  were blocked; `unpublish` closed the tunnel and returned the old URL to Cloudflare `530`;
+  the supervisor recovered from a killed `cloudflared` child and republished a working URL;
+  live browser progress advanced through 12 percentage updates and 4 stages with no console
+  errors; the Docker web image with a blank `NEXT_PUBLIC_API_URL` also served the app and proxy;
 - the CI workflow is committed and YAML-validated but has not executed on GitHub (no remote
   configured).
 

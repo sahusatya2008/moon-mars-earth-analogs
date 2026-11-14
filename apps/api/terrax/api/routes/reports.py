@@ -87,7 +87,7 @@ def download_report(report_id: uuid.UUID, db: Session = Depends(get_db)):
     return FileResponse(
         path,
         media_type=media_type,
-        filename=f"terrax-{str(report.analysis_id)[:8]}.{EXTENSIONS.get(report.format, 'dat')}",
+        filename=f"snsx-space-{str(report.analysis_id)[:8]}.{EXTENSIONS.get(report.format, 'dat')}",
         headers={
             "X-Checksum-SHA256": report.checksum_sha256 or "",
             "Cache-Control": "private, no-store",

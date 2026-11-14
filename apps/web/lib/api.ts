@@ -14,14 +14,16 @@ import type {
   TerrainMesh,
 } from "./types";
 
-export const publicApiBase = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-).replace(/\/$/, "");
+// Browser requests default to the current origin. The Next.js route handler at
+// /api/v1/[...path] proxies them to the private FastAPI service, so the public
+// site never needs a hardcoded localhost URL, CORS, or a second public port.
+const configuredPublicApiBase = (process.env.NEXT_PUBLIC_API_URL || "").trim();
+export const publicApiBase = configuredPublicApiBase.replace(/\/$/, "");
 
+// Server components and the proxy always reach FastAPI directly on the private
+// network. In Docker this is http://api:8000; on the Mac it is loopback.
 const serverApiBase = (
-  process.env.TERRAX_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8000"
+  process.env.TERRAX_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
 
 export class ApiError extends Error {
@@ -59,9 +61,10 @@ async function request<T>(
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "network error";
+    const location = base ? ` at ${base}` : "";
     throw new ApiError(
       0,
-      `Cannot reach the SNSX SPACE API at ${base}. Check that the backend is running and that this page's origin is allowed by CORS. (${reason})`,
+      `Cannot reach the SNSX SPACE API${location}. Check that the backend is running. (${reason})`,
     );
   }
   if (!response.ok) {

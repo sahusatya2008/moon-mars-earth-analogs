@@ -20,6 +20,7 @@ router = APIRouter(tags=["jobs"])
 def list_jobs(
     status: str | None = Query(default=None),
     job_type: str | None = Query(default=None),
+    analysis_id: uuid.UUID | None = Query(default=None),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -32,6 +33,9 @@ def list_jobs(
     if job_type:
         stmt = stmt.where(ProcessingJob.job_type == job_type)
         count = count.where(ProcessingJob.job_type == job_type)
+    if analysis_id:
+        stmt = stmt.where(ProcessingJob.analysis_id == analysis_id)
+        count = count.where(ProcessingJob.analysis_id == analysis_id)
     total = int(db.scalar(count) or 0)
     rows = db.scalars(
         stmt.order_by(ProcessingJob.created_at.desc())

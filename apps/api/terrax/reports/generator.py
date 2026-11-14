@@ -64,7 +64,7 @@ def _hash(path: Path) -> str:
 
 
 def _safe_filename(analysis_id: uuid.UUID, report_id: uuid.UUID, fmt: str) -> str:
-    return f"terrax-{str(analysis_id)[:8]}-{str(report_id)[:8]}.{EXTENSIONS[fmt]}"
+    return f"snsx-space-{str(analysis_id)[:8]}-{str(report_id)[:8]}.{EXTENSIONS[fmt]}"
 
 
 def _ascii(value: Any) -> str:

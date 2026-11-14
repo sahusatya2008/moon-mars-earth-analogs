@@ -29,6 +29,8 @@ ENV_FILE="$ROOT/.env"
 RUN_DIR="$ROOT/.run"
 PID_DIR="$RUN_DIR/pids"
 LOG_DIR="$RUN_DIR/logs"
+PUBLIC_URL_FILE="$RUN_DIR/public-url.txt"
+PUBLIC_FLAG="$RUN_DIR/public-enabled"
 
 COMMAND="run"
 SERVICE="all"
@@ -72,12 +74,20 @@ SNSX SPACE master runner
   ./run.sh stop [--all]
   ./run.sh status
   ./run.sh logs [api|worker|web|db|all]
+  ./run.sh public [--open]   Publish on a separate Cloudflare Quick Tunnel URL
+  ./run.sh unpublish         Stop the public tunnel
   ./run.sh install
   ./run.sh doctor
 
 The default command performs a clean start: it installs dependencies, stops old
 project processes, starts PostGIS, applies migrations, seeds the catalog,
 builds the web app, starts API + worker + web, and verifies health.
+
+Public hosting uses an independent https://<random>.trycloudflare.com URL. It
+does not use or modify Tailscale or any other site on this Mac. The API stays
+private behind a same-origin Next.js proxy. The Mac must be powered on and
+online while the tunnel is running. The hostname changes only if cloudflared
+restarts; the supervisor republishes the new URL automatically.
 EOF
 }
 
@@ -115,12 +125,16 @@ export_runtime_env() {
   if [[ -z "${NEXT_PUBLIC_API_URL:-}" ]]; then
     NEXT_PUBLIC_API_URL="$(read_env NEXT_PUBLIC_API_URL)"
   fi
-  export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
+  if [[ -n "${NEXT_PUBLIC_API_URL:-}" ]]; then
+    export NEXT_PUBLIC_API_URL
+  else
+    unset NEXT_PUBLIC_API_URL
+  fi
 
   if [[ -z "${TERRAX_API_BASE_URL:-}" ]]; then
     TERRAX_API_BASE_URL="$(read_env TERRAX_API_BASE_URL)"
   fi
-  export TERRAX_API_BASE_URL="${TERRAX_API_BASE_URL:-http://localhost:8000}"
+  export TERRAX_API_BASE_URL="${TERRAX_API_BASE_URL:-http://127.0.0.1:8000}"
 
   local key value
   for key in TERRAX_DATA_DIR TERRAX_CACHE_DIR TERRAX_REPORT_DIR; do
@@ -193,9 +207,48 @@ ensure_tools() {
   ensure_uv
   ensure_node
   ensure_docker
-  for tool in curl lsof pgrep; do
+  for tool in curl lsof pgrep python3; do
     command -v "$tool" >/dev/null 2>&1 || die "$tool is required"
   done
+}
+
+ensure_cloudflared() {
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    log "Installing cloudflared..."
+    if command -v brew >/dev/null 2>&1; then
+      brew install cloudflared
+    else
+      die "cloudflared is required for public hosting. Install it from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+    fi
+  fi
+  command -v cloudflared >/dev/null 2>&1 || die "cloudflared is not available on PATH"
+}
+
+stop_tunnel() {
+  local pid child_pid cmd
+  pid="$(cat "$PID_DIR/tunnel.pid" 2>/dev/null || true)"
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    cmd="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    if [[ "$cmd" == *public-tunnel.sh* ]]; then
+      log "Stopping public tunnel supervisor (PID $pid)..."
+      terminate_pid "$pid"
+    else
+      warn "Ignoring stale tunnel PID $pid: it is not the SNSX supervisor."
+    fi
+  fi
+
+  child_pid="$(cat "$PID_DIR/tunnel-child.pid" 2>/dev/null || true)"
+  if [[ -n "$child_pid" ]] && kill -0 "$child_pid" 2>/dev/null; then
+    cmd="$(ps -p "$child_pid" -o command= 2>/dev/null || true)"
+    if [[ "$cmd" == *cloudflared* ]]; then
+      log "Stopping public tunnel process (PID $child_pid)..."
+      terminate_pid "$child_pid"
+    else
+      warn "Ignoring stale tunnel PID $child_pid: it is not cloudflared."
+    fi
+  fi
+
+  rm -f "$PID_DIR/tunnel.pid" "$PID_DIR/tunnel-child.pid"
 }
 
 install_deps() {
@@ -396,7 +449,7 @@ start_web() {
   : > "$LOG_DIR/web.log"
   (
     cd "$WEB_DIR"
-    export NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL"
+    export NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-}"
     export TERRAX_API_BASE_URL="$TERRAX_API_BASE_URL"
     nohup node "$WEB_DIR/node_modules/next/dist/bin/next" start \
       -H 0.0.0.0 -p 3000 >> "$LOG_DIR/web.log" 2>&1 &
@@ -496,12 +549,17 @@ cmd_run() {
   fi
 
   start_all
+
+  if [[ "${SNSX_AUTO_PUBLISH:-1}" == "1" ]] && [[ -f "$PUBLIC_FLAG" ]]; then
+    cmd_public
+  fi
+
   cmd_status
 
   log "SNSX SPACE is running."
   log "Web:  http://localhost:3000"
   log "API:  http://localhost:8000"
-  log "Docs: http://localhost:8000/docs"
+  log "Docs: http://localhost:8000/api/docs"
   log "Logs: ./run.sh logs"
   open_browser
 }
@@ -527,7 +585,83 @@ stop_db() {
   fi
 }
 
+cmd_public() {
+  ensure_cloudflared
+
+  if ! curl -fsS --max-time 3 http://127.0.0.1:8000/api/v1/health >/dev/null 2>&1 \
+    || ! curl -fsS --max-time 3 http://127.0.0.1:3000/ >/dev/null 2>&1; then
+    log "SNSX SPACE is not healthy locally; starting it before publishing..."
+    local previous="${SNSX_AUTO_PUBLISH:-1}"
+    export SNSX_AUTO_PUBLISH=0
+    cmd_run
+    export SNSX_AUTO_PUBLISH="$previous"
+  fi
+
+  local existing_pid existing_url body
+  existing_pid="$(cat "$PID_DIR/tunnel.pid" 2>/dev/null || true)"
+  existing_url="$(cat "$PUBLIC_URL_FILE" 2>/dev/null || true)"
+  if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+    body=""
+    if [[ -n "$existing_url" ]]; then
+      body="$(curl -fsS --max-time 5 "$existing_url/api/v1/health" 2>/dev/null || true)"
+    fi
+    if grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' <<< "$body"; then
+      touch "$PUBLIC_FLAG"
+      log "Public URL already running: $existing_url"
+      return 0
+    fi
+    warn "The existing public tunnel is unhealthy; replacing it."
+  fi
+  stop_tunnel
+  rm -f "$PUBLIC_URL_FILE"
+
+  nohup bash "$ROOT/scripts/public-tunnel.sh" >/dev/null 2>&1 &
+  local pid url i
+  pid=$!
+  printf '%s\n' "$pid" > "$PID_DIR/tunnel.pid"
+  log "Starting an independent Cloudflare Quick Tunnel (PID $pid)..."
+
+  for i in $(seq 1 120); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      tail -n 60 "$LOG_DIR/tunnel.log" >&2 || true
+      die "The public tunnel supervisor exited before publishing a URL"
+    fi
+    url="$(cat "$PUBLIC_URL_FILE" 2>/dev/null || true)"
+    if [[ -n "$url" ]]; then
+      body="$(curl -fsS --max-time 5 "$url/api/v1/health" 2>/dev/null || true)"
+      if grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' <<< "$body"; then
+        touch "$PUBLIC_FLAG"
+        log "Public URL: $url"
+        log "Public API health check passed through the same-origin proxy."
+        warn "This URL is public and has no login. Anyone who has it can create analyses and download reports."
+        warn "This URL belongs to the SNSX tunnel only; Tailscale and other live sites are not used."
+        warn "The hostname changes only if cloudflared restarts; './run.sh status' shows the current URL."
+        warn "The Mac must stay powered on, awake, and online. Run './run.sh unpublish' to close it."
+        if (( OPEN_BROWSER )); then
+          if [[ "$(uname -s)" == "Darwin" ]]; then
+            open "$url" >/dev/null 2>&1 || true
+          elif command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "$url" >/dev/null 2>&1 || true
+          fi
+        fi
+        return 0
+      fi
+    fi
+    sleep 1
+  done
+
+  tail -n 60 "$LOG_DIR/tunnel.log" >&2 || true
+  die "cloudflared did not publish a healthy SNSX URL"
+}
+
+cmd_unpublish() {
+  stop_tunnel
+  rm -f "$PUBLIC_URL_FILE" "$PUBLIC_FLAG"
+  log "Public tunnel stopped. Tailscale and other live sites were not touched."
+}
+
 cmd_stop() {
+  cmd_unpublish
   stop_apps
   if (( STOP_DB )); then
     stop_db
@@ -538,7 +672,7 @@ cmd_stop() {
 }
 
 cmd_status() {
-  local db state health api web worker pid
+  local db state health api web worker pid public_url
   db="$(db_container || true)"
   if [[ -n "$db" ]]; then
     state="$(docker inspect -f '{{.State.Status}}' "$db" 2>/dev/null || echo unknown)"
@@ -572,6 +706,20 @@ cmd_status() {
     web="down"
   fi
   printf '%-10s %s\n' "Web" "$web (http://localhost:3000)"
+
+  public_url="$(cat "$PUBLIC_URL_FILE" 2>/dev/null || true)"
+  pid="$(cat "$PID_DIR/tunnel.pid" 2>/dev/null || true)"
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    if [[ -n "$public_url" ]] && curl -fsS --max-time 5 "$public_url/api/v1/health" >/dev/null 2>&1; then
+      printf '%-10s %s\n' "Public" "ok ($public_url)"
+    else
+      printf '%-10s %s\n' "Public" "tunnel running, health down (${public_url:-no URL yet})"
+    fi
+  elif [[ -n "$public_url" ]]; then
+    printf '%-10s %s\n' "Public" "stopped (last URL: $public_url)"
+  else
+    printf '%-10s %s\n' "Public" "not published (./run.sh public)"
+  fi
 }
 
 cmd_logs() {
@@ -606,6 +754,7 @@ cmd_doctor() {
   printf 'npm:        '; npm --version 2>/dev/null || echo missing
   printf 'docker:     '; docker --version 2>/dev/null || echo missing
   printf 'compose:    '; docker compose version 2>/dev/null || echo missing
+  printf 'cloudflared: '; cloudflared --version 2>/dev/null | sed -n '1p' || echo missing
   echo "env:        $([[ -f "$ENV_FILE" ]] && echo present || echo missing)"
   echo "api venv:   $([[ -x "$API_DIR/.venv/bin/python" ]] && echo present || echo missing)"
   echo "node_modules: $([[ -d "$WEB_DIR/node_modules" ]] && echo present || echo missing)"
@@ -624,6 +773,8 @@ case "$COMMAND" in
     cmd_run
     ;;
   stop)   cmd_stop ;;
+  public) cmd_public ;;
+  unpublish) cmd_unpublish ;;
   status) cmd_status ;;
   logs)   cmd_logs ;;
   install) cmd_install ;;

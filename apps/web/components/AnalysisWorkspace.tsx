@@ -706,7 +706,9 @@ export function AnalysisWorkspace({ analysisId }: { analysisId: string }) {
 
   useEffect(() => {
     if (!active) return;
-    const timer = window.setInterval(load, 5000);
+    // A public tunnel may buffer SSE. This poll keeps live progress moving in
+    // every deployment without changing the event contract or stored data.
+    const timer = window.setInterval(load, 2000);
     return () => window.clearInterval(timer);
   }, [active, load]);
 

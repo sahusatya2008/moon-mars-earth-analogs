@@ -573,7 +573,77 @@ were regenerated from this build. The progress capture is run
 `7391ae5e-2ea0-4b4f-bc2b-c16d174f2eed`, paused at 10% through the worker and then resumed to
 `succeeded`; it exercises the same configuration as the canonical Aristarchus run.
 
-## 6. Not verified / known gaps
+## 6. Public hosting verification (2026-11-14)
+
+An independent Cloudflare Quick Tunnel published the live stack at
+`https://booth-wives-birth-horizontal.trycloudflare.com`. The FastAPI service remained bound to
+loopback; the public origin is the Next.js app, and every API call goes through the same-origin
+proxy at `/api/v1/[...path]`. The existing `https://leou.tailabe1e6.ts.net` site on port 443 was
+checked before and after and still serves its own app (`<title>Leou. — Assignments, Mock Tests &
+Learning</title>`). Tailscale port `8443` was removed and is closed.
+
+### 6.1 Public API audit
+
+| Check | Result |
+|---|---|
+| Health through the proxy | `200`, `status: ok`, database `ok`, worker queue readable |
+| Dataset catalog | `200`, **22** datasets |
+| Analyses list, results, candidate detail, event log | `200`, stored records only |
+| SSE backlog | `200 text/event-stream`, all 21 stored events returned |
+| Evidence Q&A | `200`, cited answer with **11** citations |
+| Candidate comparison | `201` for a new stored comparison |
+| Copernicus terrain | `200`, **80** real DEM cells |
+| Earth texture | `200`, real NASA imagery |
+| Preview JPEG | `200 image/jpeg` |
+| PDF report | `200 application/pdf`, `content-disposition: attachment; filename="snsx-space-7391ae5e.pdf"` |
+| Admin route | **404** through the proxy |
+| `DELETE` | **405** |
+| Cancel endpoint | **405** |
+
+### 6.2 Public browser audit
+
+Headless Chrome loaded the production site through the public URL with software WebGL. The
+landing page, exact challenge statement, SNSX SPACE branding, hydration marker, **22** dataset
+cards, methodology, `/terrain` canvas, workspace rankings, two workspace canvases, Evidence Q&A
+(**11** citations), and a PDF downloaded through the proxy all passed. The audit recorded **zero**
+console errors, page errors, failed requests, HTTP responses ≥ 400, or requests to
+`localhost:8000`.
+
+### 6.3 Live progress through the tunnel
+
+A real analysis created through the public API was opened in the browser. The workspace showed
+**12 distinct percentage updates** and four stages (`Screening Dem` → `Refinement` →
+`Persistence` → `Complete`) before the result view replaced the progress panel, with no console
+errors. This works because the workspace polls stored analysis state every two seconds in addition
+to its EventSource subscription.
+
+### 6.4 SSE behavior and tunnel choice
+
+Direct FastAPI and the local Next.js proxy streamed all 16/21 events at their real times. The same
+stream through the Cloudflare Quick Tunnel arrived as one backlog after the analysis finished
+(event timestamps spanned **119.77 s**, but all data arrived at once). Cloudflare documents that
+Quick Tunnels buffer streaming responses, and the open `cloudflared` issue #1449 reports the same
+GET/SSE behavior. The 2-second polling fallback keeps public progress live; SSE is unchanged for
+local and streaming-capable deployments. A runtime check also confirmed a real analysis spanning
+**119.8 s** with 21 stored events.
+
+### 6.5 Lifecycle and recovery
+
+- `./run.sh unpublish` stopped the tunnel, removed the URL, and returned the old public URL to
+  Cloudflare **530**; the local stack stayed healthy.
+- `./run.sh public` published a new URL and passed the proxied health check.
+- Killing only the `cloudflared` child caused `scripts/public-tunnel.sh` to restart it and
+  republish a new healthy URL within seconds; `./run.sh status` reflected the change.
+- `./run.sh restart` preserved the existing public URL when the tunnel was healthy.
+
+### 6.6 Containerized web proxy
+
+The web image was rebuilt with a blank `NEXT_PUBLIC_API_URL`. A test container on port `3100`
+served the landing page with no `localhost:8000` references, proxied health, rendered the stored
+analysis page, returned SSE headers, and downloaded the branded PDF (4 pages). The test container
+was removed.
+
+## 7. Not verified / known gaps
 
 These are deliberately unresolved rather than hidden:
 
@@ -607,8 +677,15 @@ These are deliberately unresolved rather than hidden:
     fallback window, but it does not yet apply a global land mask to arbitrary Earth coordinates.
     A non-zero fallback surface over water could still be returned; curated candidate surfaces are
     land-refined and unaffected.
+12. **Public hosting depends on this Mac.** The Quick Tunnel works only while the machine is
+    powered on, awake, and online. It has no login, so anyone with the URL can create analyses and
+    download reports; destructive/admin routes and writes are restricted by the proxy, but there
+    is no user authentication. The URL changes if `cloudflared` restarts.
+13. **Quick Tunnel SSE is buffered.** Public live progress uses the two-second polling fallback;
+    true streaming was verified only directly against FastAPI and the local Next.js proxy.
+14. **Global screening and hardware-GPU rendering remain unverified**, as described above.
 
-## 7. Reproduction
+## 8. Reproduction
 
 ```bash
 # Backend

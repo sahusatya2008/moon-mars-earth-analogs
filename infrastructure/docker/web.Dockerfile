@@ -12,7 +12,8 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web/ ./
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+# Empty means same-origin browser requests through the Next.js API proxy.
+ARG NEXT_PUBLIC_API_URL=""
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
