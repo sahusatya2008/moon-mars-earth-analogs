@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, apiAssetUrl } from "@/lib/api";
 import type { TerrainMesh } from "@/lib/types";
 
 const RAMP: Array<[number, [number, number, number]]> = [
@@ -38,6 +38,17 @@ function displayResolution(sizeKm: number): number {
   return Math.max(120, Math.min(2000, target));
 }
 
+type TerrainView = {
+  terrain: THREE.Mesh;
+  elevationMaterial: THREE.MeshStandardMaterial;
+  imageryMaterial: THREE.MeshStandardMaterial;
+  group: THREE.Group;
+  camera: THREE.PerspectiveCamera;
+  controls: OrbitControls;
+  reset: () => void;
+  imageryTexture: THREE.Texture | null;
+};
+
 export interface Terrain3DProps {
   body: string;
   lon: number;
@@ -56,20 +67,53 @@ export function Terrain3D({
   label,
 }: Terrain3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
-  const groupRef = useRef<THREE.Group | null>(null);
-  const exaggerationRef = useRef(2);
+  const viewRef = useRef<TerrainView | null>(null);
+  const targetExaggerationRef = useRef(2);
+  const autoOrbitRef = useRef(true);
+  const imageryEnabledRef = useRef(true);
   const [mesh, setMesh] = useState<TerrainMesh | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [imageryStatus, setImageryStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [imageryEnabled, setImageryEnabled] = useState(true);
+  const [autoOrbit, setAutoOrbit] = useState(true);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [exaggeration, setExaggeration] = useState(2);
 
   useEffect(() => {
-    exaggerationRef.current = exaggeration;
-    if (groupRef.current) {
-      groupRef.current.scale.y = exaggeration;
-    }
+    targetExaggerationRef.current = exaggeration;
   }, [exaggeration]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => {
+      setPrefersReducedMotion(query.matches);
+      if (query.matches) setAutoOrbit(false);
+    };
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    autoOrbitRef.current = autoOrbit;
+    const controls = viewRef.current?.controls;
+    if (controls) {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      controls.autoRotate = autoOrbit && !reduceMotion;
+    }
+  }, [autoOrbit]);
+
+  useEffect(() => {
+    imageryEnabledRef.current = imageryEnabled;
+    const view = viewRef.current;
+    if (!view) return;
+    const useImagery = imageryEnabled && view.imageryTexture !== null;
+    view.terrain.material = useImagery ? view.imageryMaterial : view.elevationMaterial;
+  }, [imageryEnabled, imageryStatus]);
 
   useEffect(() => {
     let live = true;
@@ -77,6 +121,8 @@ export function Terrain3D({
     setMesh(null);
     setLoadError(null);
     setSceneError(null);
+    setImageryStatus("idle");
+    setImageryEnabled(true);
     api
       .terrain(body, lon, lat, sizeKm, controller.signal, displayResolution(sizeKm))
       .then((payload) => {
@@ -121,7 +167,17 @@ export function Terrain3D({
     const scene = new THREE.Scene();
     const extent = mesh.size_km * 1000;
     const camera = new THREE.PerspectiveCamera(38, 1, extent * 0.001, extent * 20);
-    camera.position.set(extent * 0.9, Math.max(extent * 0.58, (mesh.max_elevation_m - mesh.min_elevation_m) * 1.8), extent * 1.05);
+    const finalPosition = new THREE.Vector3(
+      extent * 0.9,
+      Math.max(extent * 0.58, (mesh.max_elevation_m - mesh.min_elevation_m) * 1.8),
+      extent * 1.05,
+    );
+    const introPosition = new THREE.Vector3(
+      extent * 1.45,
+      Math.max(extent * 0.92, (mesh.max_elevation_m - mesh.min_elevation_m) * 2.6),
+      extent * 1.65,
+    );
+    camera.position.copy(introPosition);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -132,10 +188,10 @@ export function Terrain3D({
     renderer.domElement.setAttribute("role", "img");
     mount.appendChild(renderer.domElement);
 
-    const ambient = new THREE.HemisphereLight(0xdfefff, 0x131a1e, 1.05);
-    const key = new THREE.DirectionalLight(0xffead6, 2.1);
+    const ambient = new THREE.HemisphereLight(0xdfefff, 0x131a1e, 0.62);
+    const key = new THREE.DirectionalLight(0xffead6, 1.28);
     key.position.set(extent * 0.7, extent * 0.95, extent * 0.45);
-    const rim = new THREE.DirectionalLight(0x62d7e4, 0.38);
+    const rim = new THREE.DirectionalLight(0x62d7e4, 0.22);
     rim.position.set(-extent * 0.8, extent * 0.3, -extent * 0.7);
     scene.add(ambient, key, rim);
 
@@ -143,11 +199,13 @@ export function Terrain3D({
     const cols = mesh.heights[0]?.length ?? 0;
     const positions = new Float32Array(rows * cols * 3);
     const colors = new Float32Array(rows * cols * 3);
+    const uvs = new Float32Array(rows * cols * 2);
     const valid = new Uint8Array(rows * cols);
     const center = mesh.mean_elevation_m;
     const range = Math.max(mesh.max_elevation_m - mesh.min_elevation_m, 1e-6);
     const dx = extent / Math.max(cols - 1, 1);
     const dz = extent / Math.max(rows - 1, 1);
+    const vertexColor = new THREE.Color();
 
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
@@ -160,10 +218,13 @@ export function Terrain3D({
         positions[index * 3] = x;
         positions[index * 3 + 1] = value - center;
         positions[index * 3 + 2] = z;
-        const color = ramp((value - mesh.min_elevation_m) / range);
-        colors[index * 3] = color[0];
-        colors[index * 3 + 1] = color[1];
-        colors[index * 3 + 2] = color[2];
+        uvs[index * 2] = cols > 1 ? col / (cols - 1) : 0.5;
+        uvs[index * 2 + 1] = rows > 1 ? 1 - row / (rows - 1) : 0.5;
+        const srgb = ramp((value - mesh.min_elevation_m) / range);
+        vertexColor.setRGB(srgb[0], srgb[1], srgb[2], THREE.SRGBColorSpace);
+        colors[index * 3] = vertexColor.r;
+        colors[index * 3 + 1] = vertexColor.g;
+        colors[index * 3 + 2] = vertexColor.b;
       }
     }
 
@@ -182,20 +243,26 @@ export function Terrain3D({
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
-    const material = new THREE.MeshStandardMaterial({
+    const elevationMaterial = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.94,
       metalness: 0,
       side: THREE.DoubleSide,
     });
-    const terrain = new THREE.Mesh(geometry, material);
+    const imageryMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.9,
+      metalness: 0,
+      side: THREE.DoubleSide,
+    });
+    const terrain = new THREE.Mesh(geometry, elevationMaterial);
     const group = new THREE.Group();
     group.add(terrain);
-    group.scale.y = exaggerationRef.current;
-    groupRef.current = group;
+    group.scale.y = 0.001;
     scene.add(group);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -206,6 +273,87 @@ export function Terrain3D({
     controls.maxDistance = extent * 3.5;
     controls.maxPolarAngle = Math.PI * 0.49;
     controls.target.set(0, 0, 0);
+    controls.autoRotateSpeed = 0.42;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Hold the orbit during the camera reveal; the render loop enables it when the
+    // reveal completes and reduced motion is not requested.
+    controls.autoRotate = false;
+
+    const reset = () => {
+      camera.position.copy(finalPosition);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    };
+
+    const view: TerrainView = {
+      terrain,
+      elevationMaterial,
+      imageryMaterial,
+      group,
+      camera,
+      controls,
+      reset,
+      imageryTexture: null,
+    };
+    viewRef.current = view;
+
+    let loadedImagery: THREE.Texture | null = null;
+    const imageryUrl =
+      mesh.imagery?.available && mesh.imagery.url ? apiAssetUrl(mesh.imagery.url) : null;
+    if (imageryUrl) {
+      setImageryStatus("loading");
+      const loader = new THREE.TextureLoader();
+      loader.setCrossOrigin("anonymous");
+      loader.load(
+        imageryUrl,
+        (texture) => {
+          if (disposed) {
+            texture.dispose();
+            return;
+          }
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+          texture.wrapS = THREE.ClampToEdgeWrapping;
+          texture.wrapT = THREE.ClampToEdgeWrapping;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          loadedImagery = texture;
+          view.imageryTexture = texture;
+          imageryMaterial.map = texture;
+          imageryMaterial.needsUpdate = true;
+          if (imageryEnabledRef.current) terrain.material = imageryMaterial;
+          setImageryStatus("ready");
+        },
+        undefined,
+        () => {
+          if (!disposed) {
+            terrain.material = elevationMaterial;
+            setImageryStatus("error");
+          }
+        },
+      );
+    } else {
+      setImageryStatus("idle");
+    }
+
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+    const pauseOrbit = () => {
+      controls.autoRotate = false;
+      if (resumeTimer) {
+        clearTimeout(resumeTimer);
+        resumeTimer = null;
+      }
+    };
+    const resumeOrbit = () => {
+      if (reduceMotion || !autoOrbitRef.current) return;
+      if (resumeTimer) clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => {
+        if (!disposed && autoOrbitRef.current) controls.autoRotate = true;
+      }, 2200);
+    };
+    controls.addEventListener("start", pauseOrbit);
+    controls.addEventListener("end", resumeOrbit);
 
     const resize = () => {
       const { width, height } = mount.getBoundingClientRect();
@@ -218,21 +366,43 @@ export function Terrain3D({
     const observer = new ResizeObserver(resize);
     observer.observe(mount);
 
-    const render = () => {
+    let introActive = !reduceMotion;
+    let currentExaggeration = targetExaggerationRef.current;
+    const introStarted = performance.now();
+    const render = (now: number) => {
       frame = requestAnimationFrame(render);
+      if (introActive) {
+        const progress = Math.min(1, (now - introStarted) / 1100);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        camera.position.lerpVectors(introPosition, finalPosition, eased);
+        group.scale.y = Math.max(0.001, currentExaggeration * eased);
+        if (progress >= 1) {
+          introActive = false;
+          controls.autoRotate = autoOrbitRef.current && !reduceMotion;
+        }
+      } else {
+        currentExaggeration +=
+          (targetExaggerationRef.current - currentExaggeration) * 0.12;
+        group.scale.y = Math.max(0.001, currentExaggeration);
+      }
       controls.update();
       renderer.render(scene, camera);
     };
-    render();
+    frame = requestAnimationFrame(render);
 
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
+      if (resumeTimer) clearTimeout(resumeTimer);
+      controls.removeEventListener("start", pauseOrbit);
+      controls.removeEventListener("end", resumeOrbit);
       observer.disconnect();
       controls.dispose();
-      groupRef.current = null;
+      if (viewRef.current === view) viewRef.current = null;
       geometry.dispose();
-      material.dispose();
+      elevationMaterial.dispose();
+      imageryMaterial.dispose();
+      loadedImagery?.dispose();
       renderer.dispose();
       if (renderer.domElement.parentElement === mount) {
         mount.removeChild(renderer.domElement);
@@ -240,8 +410,14 @@ export function Terrain3D({
     };
   }, [mesh, body, label]);
 
+  const resetView = useCallback(() => {
+    viewRef.current?.reset();
+  }, []);
+
   const loading = !mesh && !loadError;
   const error = loadError || sceneError;
+  const imageryAvailable = Boolean(mesh?.imagery?.available);
+  const imageryActive = imageryEnabled && imageryStatus === "ready";
 
   return (
     <div className={`terrain-viewer ${className || ""}`}>
@@ -266,21 +442,63 @@ export function Terrain3D({
       {mesh ? (
         <>
           <div className="terrain-toolbar">
-            <span className="terrain-badge">REAL DEM MESH</span>
-            <label className="terrain-scale">
-              Vertical exaggeration
-              <input
-                type="range"
-                min={1}
-                max={4}
-                step={0.5}
-                value={exaggeration}
-                onChange={(event) => setExaggeration(Number(event.target.value))}
-              />
-              <span>×{exaggeration.toFixed(1)}</span>
-            </label>
+            <span className="terrain-badge">
+              {imageryStatus === "loading" ? "DRAPING NASA IMAGERY" : "REAL DEM MESH"}
+            </span>
+            <div className="terrain-controls">
+              <label className="terrain-scale">
+                Vertical exaggeration
+                <input
+                  type="range"
+                  min={1}
+                  max={4}
+                  step={0.5}
+                  value={exaggeration}
+                  onChange={(event) => setExaggeration(Number(event.target.value))}
+                />
+                <span>×{exaggeration.toFixed(1)}</span>
+              </label>
+              <button
+                type="button"
+                className="terrain-toggle"
+                data-active={imageryActive}
+                aria-pressed={imageryActive}
+                disabled={!imageryAvailable || imageryStatus === "error"}
+                onClick={() => setImageryEnabled((value) => !value)}
+                title="Toggle the real NASA imagery drape"
+              >
+                NASA imagery
+              </button>
+              <button
+                type="button"
+                className="terrain-toggle"
+                data-active={autoOrbit && !prefersReducedMotion}
+                aria-pressed={autoOrbit && !prefersReducedMotion}
+                disabled={prefersReducedMotion}
+                onClick={() => setAutoOrbit((value) => !value)}
+                title={
+                  prefersReducedMotion
+                    ? "Auto-orbit is off because your system requests reduced motion"
+                    : "Toggle auto-orbit"
+                }
+              >
+                Auto-orbit
+              </button>
+              <button type="button" className="terrain-toggle" onClick={resetView}>
+                Reset view
+              </button>
+            </div>
           </div>
-          <div className="terrain-hint">drag to orbit · scroll to zoom</div>
+          <div className="terrain-hint">
+            drag to orbit · scroll to zoom ·{" "}
+            {imageryStatus === "loading"
+              ? "loading real NASA imagery"
+              : imageryStatus === "error"
+                ? "imagery unavailable, showing elevation ramp"
+                : imageryActive
+                  ? "real NASA imagery over measured DEM"
+                  : "elevation ramp"}
+          </div>
           <div className="terrain-legend">
             <span>{mesh.min_elevation_m.toFixed(0)} m</span>
             <i />
@@ -293,9 +511,13 @@ export function Terrain3D({
               {mesh.size_km} km · {mesh.resolution_m.toFixed(0)} m sampling ·{" "}
               {(mesh.valid_fraction * 100).toFixed(1)}% valid
             </span>
-            <span className="terrain-source-note">
-              {mesh.note}
-            </span>
+            {mesh.imagery?.available ? (
+              <span className="terrain-source-note">
+                Imagery: {mesh.imagery.source} · {mesh.imagery.attribution}. Draped over the
+                measured DEM for display only.
+              </span>
+            ) : null}
+            <span className="terrain-source-note">{mesh.note}</span>
           </div>
         </>
       ) : null}

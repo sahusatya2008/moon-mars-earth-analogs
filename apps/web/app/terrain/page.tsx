@@ -79,8 +79,9 @@ export default async function TerrainPage() {
           <p style={{ marginTop: 10, maxWidth: 820 }}>
             Browse the curated Moon and Mars reference windows and every distinct Earth candidate
             stored by completed analyses. Each surface is sampled on demand from the same DEM
-            products used for measurement: LRO LOLA, MGS MOLA, or Copernicus GLO-30. No reference
-            imagery is used as geometry.
+            products used for measurement: LRO LOLA, MGS MOLA, or Copernicus GLO-30. Real NASA
+            imagery is draped over the measured geometry for display only; it never contributes to
+            elevation or similarity scoring.
           </p>
         </div>
         <span className="chip idle">{targets.length} surfaces</span>

@@ -1,4 +1,4 @@
-# TERRA-X Verification Report
+# SNSX SPACE Verification Report
 
 **Executed:** 2026-11-13 (local session); Planetary Computer, Meteomatics, and container checks
 2026-11-14
@@ -16,7 +16,7 @@ without a command and observed result.
 
 | Check | Command | Observed result |
 |---|---|---|
-| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **76 passed, 3 warnings** |
+| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **77 passed, 3 warnings** |
 | Backend lint | `.venv/bin/ruff check terrax tests` | **All checks passed** |
 | Frontend types | `npm run typecheck` | **Passed** (`tsc --noEmit`, no diagnostics) |
 | Frontend production build | `npm run build` | **Passed**; `/`, `/analyses`, `/terrain`, `/datasets`, `/methodology`, and dynamic `/analyses/[id]` emitted |
@@ -42,7 +42,7 @@ degenerate mesh, and route validation for unsupported bodies, invalid coordinate
 footprints. The report tests assert that GeoJSON does not apply a collection-wide Earth CRS to
 Moon/Mars features. Config tests assert that the repository root resolves correctly in both the
 checkout layout (`<repo>/apps/api/terrax/config.py`) and the container layout
-(`/app/terrax/config.py`). The observed count in this session was **76 passed**.
+(`/app/terrax/config.py`). The observed count in this session was **77 passed**.
 
 Twelve dedicated Planetary Computer tests cover SAS signing restricted to Azure blob hosts,
 token redaction, cached token refresh, antimeridian splitting and item de-duplication, DEM
@@ -202,7 +202,7 @@ that the Mars path completes and persists inspectable scores.
 
 ### 2.3 Live progress (SSE) run
 
-The canonical Moon run was watched from creation to completion through the browser:
+The canonical Moon configuration was watched from creation to completion through the browser:
 
 - at **10%** the workspace showed status **RUNNING**, stage **Reference Features**, and the first
   five real worker events;
@@ -214,6 +214,9 @@ The canonical Moon run was watched from creation to completion through the brows
   `is not valid JSON`.
 
 ![Live SSE progress](media/progress.png)
+
+The image above is a subsequent run of the same configuration, paused through the worker at
+**10%**, status **RUNNING**, stage **Reference Features**, showing five real worker events.
 
 Two defects were found and fixed during this verification:
 
@@ -358,7 +361,7 @@ and checked for checksum integrity and credential leakage.
 All five downloads matched their stored SHA-256, and the connector's response `user` field was
 not persisted.
 
-## 4. Assistant
+## 4. Evidence Q&A
 
 `POST /api/v1/assistant/query` was run against the canonical Moon analysis with the question
 “Why did the top candidate rank first?”. Observed response:
@@ -369,7 +372,7 @@ not persisted.
 - answer quoted the stored top candidate, coordinates, similarity, confidence band, strongest
   dimensions, feature deltas, tolerances, and feature-level similarities.
 
-No LLM key was configured for this check. The grounded narrator is the tested path.
+No external model key was configured for this check. The built-in evidence responder is the tested path.
 
 ## 5. Browser checks
 
@@ -385,7 +388,7 @@ The running production build was inspected through headless Chrome at 1600 px wi
 | Candidate selection | Scatter/target row changes the profile and evidence panel |
 | Candidate comparison | Stored-score comparison table renders for selected candidates |
 | Report panel | 5 ready formats and 5 download links; downloads checksum-verified |
-| Assistant | Cited answer renders with 6 citations |
+| Evidence Q&A | Cited answer renders with 6 citations |
 | SSE progress | Live stage/progress/events render; terminal transition succeeds |
 | Data observatory | **22** products render (**16 Earth, 3 Moon, 3 Mars**), including all five Planetary Computer collections and credential-gated Meteomatics; catalog filter, scoring-input filter, body groups, and live probe controls render |
 | Planetary Computer evidence | Top candidate shows NASADEM/ALOS DEM metrics, IO LULC agreement, and Sentinel-2/Landsat scene context; unsigned preview `<img>` URLs load HTTP 200 `image/png` |
@@ -453,9 +456,9 @@ filters, search, surface switching, and the display-only vertical-exaggeration c
 exercised; every terrain request returned HTTP 200, no `.terrain-error` appeared, and the console
 was clean. All eight Earth candidate surfaces were also requested directly after the Planetary
 Computer run: each returned an 80×80 Copernicus grid with **6,400/6,400** valid cells and elevations
-between 613.5 m and 4,294.9 m. Geometry is elevation only: no imagery texture is used, missing
-cells stay `null`, and triangles touching a missing cell are omitted. The unit tests assert strict
-JSON `null` handling and cache round trips.
+between 613.5 m and 4,294.9 m. Geometry is elevation only: an optional NASA imagery drape is
+applied for display over the same footprint, missing cells stay `null`, and triangles touching a
+missing cell are omitted. The unit tests assert strict JSON `null` handling and cache round trips.
 
 ### 5.2 CORS and hydration fixes
 
@@ -475,15 +478,15 @@ Screenshots in `docs/media/` were captured from these running services:
   `progress.png`.
 
 `landing.png` is the SwiftShader render with the real Earth texture, **22** datasets, 9 reference
-regions, 11 stored analyses, the latest Meteomatics Aristarchus run (top similarity 0.734), and the
-start of the real 3D terrain section. `datasets.png` shows the 22-product catalog, the Planetary
+regions, **13** stored analyses, the latest Aristarchus run (top similarity 0.789), the exact NASA
+Space Apps Challenge 2026 statement, and the start of the real 3D terrain section. `datasets.png` shows the 22-product catalog, the Planetary
 Computer access note, credential-gated Meteomatics, and the probe chips **21 available / 1 gated /
 0 unknown**. `methodology.png` shows methodology version 0.4.0 with the persisted `f541712c`
-configuration and the weather-context statement. `workspace.png` is the Meteomatics run with the
-four-surface 3D terrain panel, five ready reports, all three candidates, the weather insight, and
-the NASADEM/ALOS and IO LULC evidence metrics. `terrain.png` is the `/terrain` explorer showing
+configuration, the weather-context statement, and the challenge statement. `workspace.png` is a completed Aristarchus run with the
+four-surface 3D terrain panel, five ready reports, all three candidates, the Evidence Q&A panel,
+the weather insight, and the NASADEM/ALOS and IO LULC evidence metrics. `terrain.png` is the `/terrain` explorer showing
 all **17** surfaces (8 Earth, 4 Moon, 5 Mars), a real Earth Copernicus mesh, and candidate labels
-from the Meteomatics run. `progress.png` is the canonical run mid-execution at 10%, showing
+from the Meteomatics run. `progress.png` is a same-configuration run mid-execution at 10%, showing
 `RUNNING`, not an error.
 
 ### 5.3 Terrain fallback and GeoJSON integrity fixes
@@ -518,6 +521,58 @@ Licensing and disclaimer files were also added: `LICENSE` (Apache-2.0), `NOTICE`
 attributions, a README non-affiliation statement, and a footer notice in the web interface. The
 production Next.js build and the development server both render the footer notice.
 
+### 5.4 Real imagery drape and 3D animation (2026-11-14)
+
+The terrain payload moved to cache version `terrain3d-v3` and now carries an `imagery` descriptor
+alongside the measured DEM grid. The descriptor points at the existing preview route for the same
+spherical footprint; the viewer maps preview row 0 to north and column 0 to west. Imagery remains
+display-only and is never used as geometry or as a similarity input. Live checks:
+
+| Surface | Imagery source | Terrain payload | Preview |
+|---|---|---|---|
+| Earth · Atacama candidate | NASA GIBS Blue Marble Shaded Relief and Bathymetry | HTTP 200, `imagery.available: true` | HTTP 200 `image/jpeg` |
+| Moon · Aristarchus Plateau | NASA TREK LRO WAC global mosaic | HTTP 200, `imagery.available: true` | HTTP 200 `image/jpeg`, 37,416 bytes |
+| Mars · Gale Crater | NASA TREK Mars Viking MDIM21 color mosaic | HTTP 200, `imagery.available: true` | HTTP 200 `image/jpeg` |
+
+`data/cache/terrain3d/terrain3d-v3` was populated on the first request; the older `terrain3d-v2`
+directory is no longer read. The terrain viewer now:
+
+- drapes the real preview texture with aligned UVs over the sampled DEM, with a texture-fade-in;
+- exposes a NASA-imagery/elevation toggle, auto-orbit, reset-view, and smooth vertical
+  exaggeration, while pausing orbit during drag and resuming after 2.2 s;
+- reveals the mesh with an eased camera move and keeps the elevation ramp as the fallback when the
+  imagery request fails;
+- respects `prefers-reduced-motion` by skipping auto-orbit, reveal, and pulse animation.
+
+The globe component adds real axial tilt (Earth 23.44°, Moon 6.68°, Mars 25.19°), a texture
+fade-in, and phase-offset pin pulses; it also disables animation under reduced motion. Headless
+Chrome with SwiftShader rendered the landing Earth globe, the `/terrain` explorer, and the
+workspace terrain panel from live data: a canvas was present, `REAL DEM MESH` and the imagery
+credit rendered, and no `3D terrain unavailable` state or console error appeared. The checked
+`/terrain` scene used `copernicus_dem_glo30` at 500 m sampling, 100% valid cells, 1,032–2,664 m,
+with the NASA GIBS drape visible over the mesh. Animation timing was verified from consecutive
+renders and the running animation loop rather than from a hardware-GPU drag test.
+
+### 5.5 SNSX SPACE identity and challenge statement (2026-11-14)
+
+The public identity was rechecked against the running production build and the live API:
+
+| Check | Observed result |
+|---|---|
+| Page title | `SNSX SPACE · Planetary analogue intelligence` on the checked pages |
+| Brand | **SNSX SPACE** in the navigation, hero, footer, workspace, data observatory, and methodology page |
+| Challenge statement | exact text **“Identify Earth Locations that Analog the Permanent Moon Base Locations and Mars”** on the landing banner, footer, methodology page, and page metadata |
+| Nav status | `NASA SPACE APPS 2026` (rendered uppercase from “NASA Space Apps 2026”) |
+| Previous identity | no previous brand string rendered on the checked pages |
+| API metadata | OpenAPI title **SNSX SPACE Planetary Analogue Intelligence** at `/api/openapi.json` |
+| Package metadata | `snsx-space-web`, `snsx-space-api`; outbound user agent `SNSX-SPACE/0.1` |
+| Browser console | **0** errors during the five screenshot captures |
+
+The landing, terrain, workspace, datasets, methodology, and progress screenshots in `docs/media/`
+were regenerated from this build. The progress capture is run
+`7391ae5e-2ea0-4b4f-bc2b-c16d174f2eed`, paused at 10% through the worker and then resumed to
+`succeeded`; it exercises the same configuration as the canonical Aristarchus run.
+
 ## 6. Not verified / known gaps
 
 These are deliberately unresolved rather than hidden:
@@ -531,7 +586,7 @@ These are deliberately unresolved rather than hidden:
    configured account, but `NASA_EARTHDATA_TOKEN` and `NASA_FIRMS_MAP_KEY` were not configured.
    `/health` reports `earthdata_configured: false` and `meteomatics_configured: true`; the
    unconfigured rows report `requires_credentials`, not “connected”.
-3. **No LLM provider was exercised.** Only the deterministic grounded narrator was tested.
+3. **No external language-model provider was exercised.** Only the built-in evidence Q&A responder was tested.
 4. **No Redis path was exercised.** Redis is optional and unused by the default Postgres queue.
 5. **Large NASA/PDS archives were not downloaded.** The delivery network ran at roughly 100 KB/s;
    the implementation uses windowed range reads and local caches. Bulk archive ingestion remains

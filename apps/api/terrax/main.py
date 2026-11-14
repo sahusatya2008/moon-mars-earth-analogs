@@ -40,14 +40,14 @@ RATE_LOCK = __import__("threading").Lock()
 async def lifespan(_app: FastAPI):
     settings.ensure_dirs()
     log.info(
-        "TERRA-X API %s starting in %s; cache=%s reports=%s",
+        "SNSX SPACE API %s starting in %s; cache=%s reports=%s",
         __version__,
         settings.terrax_env,
         settings.cache_dir,
         settings.report_dir,
     )
     yield
-    log.info("TERRA-X API stopping")
+    log.info("SNSX SPACE API stopping")
 
 
 def _rate_limit(request: Request) -> bool:
@@ -75,7 +75,7 @@ def _rate_limit(request: Request) -> bool:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="TERRA-X Planetary Analogue Intelligence",
+        title="SNSX SPACE Planetary Analogue Intelligence",
         description=(
             "Real-data planetary analogue discovery. Similarity is a bounded heuristic and is not "
             "a probability or a landing-safety assessment."
@@ -127,7 +127,7 @@ def create_app() -> FastAPI:
     @app.get("/", tags=["meta"])
     def root():
         return {
-            "name": "TERRA-X planetary analogue intelligence",
+            "name": "SNSX SPACE planetary analogue intelligence",
             "version": __version__,
             "api": "/api/v1",
             "docs": "/api/docs",

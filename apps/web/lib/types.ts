@@ -329,6 +329,15 @@ export interface TerrainSource {
   method: string;
 }
 
+export interface TerrainImagery {
+  available: boolean;
+  url: string;
+  dataset_id: string;
+  source: string;
+  attribution: string;
+  role: string;
+}
+
 export interface TerrainMesh {
   body_id: BodyId;
   center: { lon: number; lat: number };
@@ -345,6 +354,7 @@ export interface TerrainMesh {
   mean_elevation_m: number;
   heights: Array<Array<number | null>>;
   source: TerrainSource;
+  imagery?: TerrainImagery;
   note: string;
   generated_at: string;
   cache_hit: boolean;

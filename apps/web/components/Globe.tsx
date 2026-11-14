@@ -30,6 +30,12 @@ function pinPosition(lon: number, lat: number, radius: number): THREE.Vector3 {
   );
 }
 
+const AXIAL_TILT_DEG: Record<string, number> = {
+  earth: 23.44,
+  moon: 6.68,
+  mars: 25.19,
+};
+
 export function Globe({
   body,
   pins = [],
@@ -48,6 +54,7 @@ export function Globe({
     const activePins: GlobePin[] = JSON.parse(pinKey);
     let disposed = false;
     setState("loading");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 20);
     camera.position.set(0, 0.25, 3.4);
@@ -70,6 +77,8 @@ export function Globe({
     renderer.domElement.style.display = "block";
     renderer.domElement.style.width = "100%";
     renderer.domElement.style.height = "100%";
+    renderer.domElement.setAttribute("aria-label", `Interactive ${body} globe`);
+    renderer.domElement.setAttribute("role", "img");
     mount.appendChild(renderer.domElement);
 
     const ambient = new THREE.AmbientLight(0xffffff, 1.35);
@@ -79,16 +88,21 @@ export function Globe({
     rim.position.set(-3, -1, -2);
     scene.add(ambient, key, rim);
 
-    const geometry = new THREE.SphereGeometry(1, 96, 64);
+    const geometry = new THREE.SphereGeometry(1, 128, 80);
     const material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.95,
       metalness: 0.02,
+      transparent: true,
+      opacity: 0,
     });
     const sphere = new THREE.Mesh(geometry, material);
     sphere.rotation.y = -0.6;
+    sphere.rotation.z = THREE.MathUtils.degToRad(AXIAL_TILT_DEG[body] ?? 0);
+    sphere.scale.setScalar(reduceMotion ? 1 : 0.94);
     scene.add(sphere);
 
+    let textureLoaded = false;
     const loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
     loader.load(
@@ -102,6 +116,7 @@ export function Globe({
         texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
         material.map = texture;
         material.needsUpdate = true;
+        textureLoaded = true;
         setState("ready");
       },
       undefined,
@@ -111,7 +126,11 @@ export function Globe({
     );
 
     const pinGroup = new THREE.Group();
-    for (const pin of activePins) {
+    const pulses: Array<{
+      ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+      phase: number;
+    }> = [];
+    activePins.forEach((pin, index) => {
       const radius = 1.008;
       const position = pinPosition(pin.lon, pin.lat, radius);
       const color = new THREE.Color(pin.color || "#ff6b35");
@@ -122,20 +141,19 @@ export function Globe({
       marker.position.copy(position);
       pinGroup.add(marker);
 
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(0.019, 0.026, 32),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.8,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        }),
-      );
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.019, 0.026, 40), ringMaterial);
       ring.position.copy(position);
       ring.lookAt(0, 0, 0);
       pinGroup.add(ring);
-    }
+      pulses.push({ ring, phase: index * 1.7 });
+    });
     sphere.add(pinGroup);
 
     const atmosphere = new THREE.Mesh(
@@ -156,8 +174,8 @@ export function Globe({
     controls.enablePan = false;
     controls.enableZoom = interactive;
     controls.enableRotate = interactive;
-    controls.autoRotate = autoRotate;
-    controls.autoRotateSpeed = 0.38;
+    controls.autoRotate = autoRotate && !reduceMotion;
+    controls.autoRotateSpeed = 0.45;
     controls.minDistance = 2.4;
     controls.maxDistance = 5.2;
 
@@ -173,12 +191,26 @@ export function Globe({
     observer.observe(mount);
 
     let frame = 0;
-    const render = () => {
+    const started = performance.now();
+    const render = (now: number) => {
       frame = requestAnimationFrame(render);
+      if (!reduceMotion) {
+        const reveal = Math.min(1, (now - started) / 900);
+        const eased = 1 - Math.pow(1 - reveal, 3);
+        sphere.scale.setScalar(0.94 + 0.06 * eased);
+        for (const pulse of pulses) {
+          const wave = 0.5 + 0.5 * Math.sin(now * 0.0024 + pulse.phase);
+          pulse.ring.scale.setScalar(1 + 0.18 * wave);
+          pulse.ring.material.opacity = 0.45 + 0.4 * wave;
+        }
+      }
+      if (textureLoaded) {
+        material.opacity = reduceMotion ? 1 : Math.min(1, material.opacity + 0.045);
+      }
       controls.update();
       renderer.render(scene, camera);
     };
-    render();
+    frame = requestAnimationFrame(render);
 
     return () => {
       disposed = true;

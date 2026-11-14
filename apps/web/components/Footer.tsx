@@ -3,9 +3,13 @@ export function Footer() {
     <footer className="footer">
       <div className="shell footer-row">
         <div>
-          <b style={{ color: "var(--muted)", letterSpacing: "0.1em" }}>TERRA-X</b>
+          <b style={{ color: "var(--muted)", letterSpacing: "0.1em" }}>SNSX SPACE</b>
           <br />
           Similarity is a bounded heuristic, not a probability or a landing-safety assessment.
+          <div className="tiny faint" style={{ marginTop: 8 }}>
+            NASA Space Apps Challenge 2026 · Identify Earth Locations that Analog the Permanent Moon
+            Base Locations and Mars.
+          </div>
           <div className="tiny faint" style={{ marginTop: 8 }}>
             Independent research prototype. Not an official NASA product; not affiliated with or
             endorsed by NASA.

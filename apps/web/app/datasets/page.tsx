@@ -142,7 +142,7 @@ export default function DatasetsPage() {
           <div className="eyebrow">Data observatory</div>
           <h2>The catalog is a contract</h2>
           <p style={{ marginTop: 10, maxWidth: 780 }}>
-            Every product used by TERRA-X is registered with its agency, mission, resolution,
+            Every product used by SNSX SPACE is registered with its agency, mission, resolution,
             license, citation, and access protocol. The Microsoft Planetary Computer collections
             are read through public STAC metadata and automatically issued, short-lived SAS
             tokens; the tokens are never stored with results. Credential-gated Meteomatics

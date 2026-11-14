@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# TERRA-X API and worker share this image; the worker overrides CMD in compose.
+# SNSX SPACE API and worker share this image; the worker overrides CMD in compose.
 FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

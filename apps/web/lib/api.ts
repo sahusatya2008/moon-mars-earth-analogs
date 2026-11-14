@@ -61,7 +61,7 @@ async function request<T>(
     const reason = error instanceof Error ? error.message : "network error";
     throw new ApiError(
       0,
-      `Cannot reach the TERRA-X API at ${base}. Check that the backend is running and that this page's origin is allowed by CORS. (${reason})`,
+      `Cannot reach the SNSX SPACE API at ${base}. Check that the backend is running and that this page's origin is allowed by CORS. (${reason})`,
     );
   }
   if (!response.ok) {
@@ -148,6 +148,10 @@ export const api = {
 
 export function textureUrl(body: string): string {
   return `${publicApiBase}/api/v1/textures/${body}.jpg`;
+}
+
+export function apiAssetUrl(path: string): string {
+  return path.startsWith("http") ? path : `${publicApiBase}${path}`;
 }
 
 export function reportDownloadUrl(id: string): string {

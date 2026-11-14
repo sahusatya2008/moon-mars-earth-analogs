@@ -1,4 +1,4 @@
-"""Grounded research assistant endpoint."""
+"""Evidence Q&A endpoint."""
 
 from __future__ import annotations
 

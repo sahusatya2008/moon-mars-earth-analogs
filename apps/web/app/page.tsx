@@ -81,19 +81,25 @@ export default async function HomePage() {
 
   return (
     <main>
+      <section className="challenge-banner" aria-label="Challenge statement">
+        <div className="shell challenge-inner">
+          <span className="challenge-badge">NASA Space Apps Challenge 2026</span>
+          <p>Identify Earth Locations that Analog the Permanent Moon Base Locations and Mars</p>
+        </div>
+      </section>
       <section className="hero">
         <div className="shell hero-grid">
           <div>
             <div className="eyebrow">Planetary analogue intelligence · v0.4</div>
             <h1 className="display">
-              <span className="terra">TERRA</span>
-              <span className="x">-X</span>
+              <span className="brand-main">SNSX</span>
+              <span className="brand-accent">SPACE</span>
             </h1>
             <p className="hero-copy">
-              A Moon or Mars region is not like Earth because it looks similar. TERRA-X measures
-              the terrain at a common physical scale, screens real Earth topography, and ranks
-              analogues with declared tolerances. Similarity and confidence stay separate, and
-              every value is traceable to its source.
+              A Moon or Mars region is not like Earth because it looks similar. SNSX SPACE
+              measures the terrain at a common physical scale, screens real Earth topography, and
+              ranks analogues with declared tolerances. Similarity and confidence stay separate,
+              and every value is traceable to its source.
             </p>
             <div className="hero-actions">
               <Link className="btn primary" href="/analyses">
@@ -194,11 +200,12 @@ export default async function HomePage() {
             <div className="section-head">
               <div>
                 <div className="eyebrow cyan">Real 3D terrain</div>
-                <h2>Elevation, not a reference image.</h2>
+                <h2>Measured elevation, real imagery.</h2>
               </div>
               <p>
                 These meshes are sampled from the stored DEM products used by the latest run.
-                Drag to orbit and change the display-only vertical exaggeration.
+                Real NASA imagery is draped over the measured geometry for display only. Drag to
+                orbit and change the display-only vertical exaggeration.
               </p>
             </div>
             <div className="terrain-pair">

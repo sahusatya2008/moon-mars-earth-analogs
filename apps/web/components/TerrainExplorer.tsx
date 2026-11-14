@@ -162,7 +162,8 @@ export function TerrainExplorer({ targets }: { targets: TerrainTarget[] }) {
             />
             <div className="terrain-stage-foot">
               Every vertex is sampled from the authoritative DEM product shown above the legend.
-              Missing cells stay missing; the mesh never interpolates or invents elevation. Vertical
+              The NASA imagery drape is aligned to the same footprint and is display-only. Missing
+              cells stay missing; the mesh never interpolates or invents elevation. Vertical
               exaggeration changes the display only and is not used in similarity scoring.
             </div>
           </>

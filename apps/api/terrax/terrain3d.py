@@ -22,12 +22,52 @@ from .connectors.planetary_dem import load_reference_dem
 
 settings = get_settings()
 
-# v2 invalidates meshes written before the constant-zero fallback guard. A v1 Earth mesh for
-# an ocean/void location could contain a flat 0 m surface marked as fully valid.
-CACHE_VERSION = "terrain3d-v2"
+# v3 adds the real NASA imagery descriptor used by the terrain viewer. Older cached
+# meshes are regenerated so the viewer never silently loses that provenance.
+CACHE_VERSION = "terrain3d-v3"
 DEFAULT_RESOLUTION_M = 500.0
 SUPPORTED_BODIES = ("earth", "moon", "mars")
 MAX_GRID_CELLS = 320
+
+# Real source imagery draped over the measured DEM for display only. The terrain
+# measurements themselves always come from the DEM source in ``payload["source"]``.
+IMAGERY = {
+    "earth": {
+        "dataset_id": "nasa_gibs",
+        "source": "NASA GIBS Blue Marble Shaded Relief and Bathymetry",
+        "attribution": "NASA EOSDIS / GIBS",
+    },
+    "moon": {
+        "dataset_id": "lro_wac_mosaic",
+        "source": "NASA TREK LRO WAC global mosaic",
+        "attribution": "NASA / USGS Astrogeology",
+    },
+    "mars": {
+        "dataset_id": "mars_viking_mdim21",
+        "source": "NASA TREK Mars Viking MDIM21 color mosaic",
+        "attribution": "NASA / USGS Astrogeology",
+    },
+}
+
+
+def _imagery_metadata(body_id: str, lon: float, lat: float, size_km: float) -> dict[str, Any]:
+    """Describe the real, north-up preview that can be draped over the DEM.
+
+    The preview route returns a square image for the same spherical footprint. The
+    renderer maps row 0 to north and column 0 to west, matching the mesh conventions.
+    """
+    source = IMAGERY[body_id]
+    return {
+        "available": True,
+        "url": (
+            f"/api/v1/previews/{body_id}/{lon:.5f}/{lat:.5f}/{size_km:.1f}.jpg"
+            "?width=1024"
+        ),
+        "dataset_id": source["dataset_id"],
+        "source": source["source"],
+        "attribution": source["attribution"],
+        "role": "real source imagery draped over the measured DEM (display only)",
+    }
 
 
 def _cache_path(
@@ -112,9 +152,12 @@ def _window_to_payload(
         "mean_elevation_m": round(mean, 2),
         "heights": heights,
         "source": source,
+        "imagery": _imagery_metadata(body_id, lon, lat, size_km),
         "note": (
-            "Real elevation samples from the stored DEM product. Geometry only; no imagery "
-            "texture is used and missing cells are left as null rather than filled."
+            "Real elevation samples from the stored DEM product. The optional NASA imagery "
+            "is a display drape over the same footprint; it is never used as geometry or "
+            "for similarity scoring, and missing elevation cells remain null rather than "
+            "filled."
         ),
         "generated_at": datetime.now(UTC).isoformat(),
         "cache_hit": False,

@@ -1,10 +1,13 @@
-# TERRA-X
+# SNSX SPACE
 
-**Planetary analogue intelligence.** TERRA-X measures a Moon or Mars terrain window and finds
+**Planetary analogue intelligence.** SNSX SPACE measures a Moon or Mars terrain window and finds
 physically comparable regions on Earth using authoritative topography. Similarity, confidence, and
 evidence coverage are separate, and every number is traceable to a stored source product.
 
-> **Independent research prototype.** TERRA-X is not an official NASA product and is not
+> **NASA Space Apps Challenge 2026** — *Identify Earth Locations that Analog the Permanent Moon Base
+> Locations and Mars.* SNSX SPACE is the working platform built for that problem statement.
+
+> **Independent research prototype.** SNSX SPACE is not an official NASA product and is not
 > affiliated with, endorsed by, or sponsored by NASA. Agency, mission, and product names identify
 > data sources only. See [NOTICE](NOTICE) for data attributions and [LICENSE](LICENSE) for the
 > code license.
@@ -12,9 +15,10 @@ evidence coverage are separate, and every number is traceable to a stored source
 This is a working scientific vertical slice: real DEM access, real screening, real refinement,
 persisted runs, live job progress, reports, and tests. It is not a mockup, and it does not substitute
 sample data when a service is unavailable. Every terrain view is a 3D mesh sampled from the same DEM
-products used by the analysis; reference imagery is used for globes, never as terrain geometry.
+products used by the analysis; reference imagery is used for globes and as a display-only drape over
+the measured terrain, never as geometry or a scoring input.
 
-![TERRA-X landing page](docs/media/landing.png)
+![SNSX SPACE landing page](docs/media/landing.png)
 
 ## What it does
 
@@ -72,6 +76,13 @@ and `/terrain` explorer all use the same endpoint:
 GET /api/v1/terrain/{body}/{lon}/{lat}/{size_km}.json?resolution_m=500
 ```
 
+Real NASA imagery is aligned to the same footprint and draped over the measured geometry for
+display only: NASA GIBS Blue Marble for Earth, the LRO WAC global mosaic for the Moon, and the Mars
+Viking MDIM21 mosaic. The viewer offers a NASA-imagery/elevation toggle, auto-orbit, reset view, and
+smooth vertical exaggeration; if the imagery request fails it falls back to the elevation ramp.
+Imagery never contributes to elevation or similarity scoring, and the payload records its source
+under `imagery` (cache version `terrain3d-v3`).
+
 ## Quick start (Docker)
 
 Requires Docker with Compose. No scientific credentials are needed for the core workflow.
@@ -128,7 +139,7 @@ All configuration is environment-based; see `.env.example`. The core path needs 
 | `NASA_EARTHDATA_TOKEN` | optional, for authenticated Earthdata products |
 | `NASA_FIRMS_MAP_KEY` | optional fire context |
 | `METEOMATICS_USERNAME`, `METEOMATICS_PASSWORD` | optional, credentialed weather context |
-| `TERRAX_LLM_*`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | optional assistant provider; the deterministic grounded narrator works without any |
+| `TERRAX_LLM_*`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | optional Evidence Q&A provider; the built-in responder works without any |
 | `TERRAX_ADMIN_API_KEY` | optional protection for admin endpoints |
 
 Missing credentials are reported as `requires_credentials`, never as connected.
@@ -213,7 +224,7 @@ Optional Meteomatics weather adds a 48-hour point forecast (temperature, wind, h
 precipitation, and cloud cover) as operational context. Every catalog entry carries its own
 agency, citation, license, resolution, access protocol, and live-availability state.
 
-Planetary Computer raster assets are private Azure blobs. TERRA-X obtains a short-lived public SAS
+Planetary Computer raster assets are private Azure blobs. SNSX SPACE obtains a short-lived public SAS
 token per collection, appends it only for `*.blob.core.windows.net` reads, and never writes signed
 URLs or tokens to evidence, manifests, reports, or logs. The STAC metadata and unsigned preview
 links remain public and citable. Meteomatics uses HTTP Basic authentication from the environment;
@@ -226,7 +237,7 @@ gated products remain intentionally out of the core path.
 
 ## License and attribution
 
-The TERRA-X source code is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE).
+The SNSX SPACE source code is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE).
 Data products and services retain their own terms and are attributed in [NOTICE](NOTICE). The
 Apache license does not grant rights to NASA, USGS, ESA, Copernicus, or other agency names or
 marks, and nothing in this repository implies endorsement by those agencies.
@@ -236,8 +247,8 @@ marks, and nothing in this repository implies endorsement by those agencies.
 Executed on 2026-11-13, with the Planetary Computer, Meteomatics, and container checks run on
 2026-11-14:
 
-- backend: **76 passed**, 3 non-failing warnings, including 12 Planetary Computer and 8 Meteomatics
-  tests; Ruff clean;
+- backend: **77 passed**, 3 non-failing warnings, including 6 terrain, 12 Planetary Computer, and
+  8 Meteomatics tests; Ruff clean;
 - frontend: TypeScript clean and production build passed, including `/terrain`;
 - canonical Moon run `0f81536a-fd92-4e90-80be-558679889b59`: 68 coarse samples, 3/3 refinements
   succeeded, 3 candidates, top similarity **0.789007** with **0.904513** high confidence;
@@ -256,12 +267,19 @@ Executed on 2026-11-13, with the Planetary Computer, Meteomatics, and container 
   `sig=` or `<sas>` appeared in any export or in API/worker logs;
 - 3D terrain: 2 landing meshes, 4 workspace surfaces, and **17** distinct surfaces in `/terrain`
   rendered real DEM geometry; all eight Earth candidate surfaces returned 6,400/6,400 Copernicus
-  cells; an ocean/void coordinate now returns HTTP 422 instead of a flat 0 m mesh;
+  cells; an ocean/void coordinate now returns HTTP 422 instead of a flat 0 m mesh; real NASA
+  imagery previews (GIBS Blue Marble, LRO WAC, Viking MDIM21) are draped over the measured
+  geometry for display only, with a working imagery/elevation toggle, auto-orbit, reset view, and
+  reduced-motion support;
 - GeoJSON reports no longer apply an Earth CRS to Moon/Mars features; per-feature spatial
   reference metadata is emitted instead;
 - CORS local-origin handling and the root hydration attribute warning were fixed and
   browser-verified;
-- browser checks covered rankings, candidate comparison, reports, assistant, SSE progress,
+- the SNSX SPACE identity was rechecked live: the navigation, hero, footer, workspace, data
+  observatory, methodology page, page metadata, API title, and package names carry the new brand,
+  and the exact NASA Space Apps Challenge 2026 statement appears in the landing banner, footer,
+  methodology page, README, and docs; no page rendered the old identity;
+- browser checks covered rankings, candidate comparison, reports, Evidence Q&A, SSE progress,
   Planetary Computer evidence metrics/previews, the no-WebGL fallback, and SwiftShader
   software-WebGL globe and terrain renders;
 - **containerized stack verified**: API, worker, and web images built from the committed

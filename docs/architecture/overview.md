@@ -1,12 +1,15 @@
-# TERRA-X Architecture
+# SNSX SPACE Architecture
 
 **Status:** implemented baseline · version 0.4.0
+
+**Challenge:** NASA Space Apps Challenge 2026 — *Identify Earth Locations that Analog the Permanent
+Moon Base Locations and Mars*
 
 **Scope:** planetary analogue discovery for Earth, the Moon, and Mars
 
 ## 1. Design position
 
-TERRA-X compares *measured* properties of a Moon or Mars reference window with measured
+SNSX SPACE compares *measured* properties of a Moon or Mars reference window with measured
 properties of real Earth windows. Every displayed number traces to a product, spatial window,
 processing method, and version. Missing evidence is shown as missing.
 
@@ -53,7 +56,7 @@ The system is a **modular monolith plus independently scalable workers**:
 | Modular monolith | The scientific domain shares one observation schema and one transaction boundary; splitting it prematurely would add failure modes without benefit. |
 | Separate worker | Raster I/O and feature extraction must not block API requests. Workers scale horizontally from the same image. |
 | Windowed raster access | Only the requested 40 km window is read from planetary cubes and COGs; global archives are never downloaded to analyse one region. |
-| Deterministic science first | Rankings, reports, and the grounded assistant work with no LLM and no external API key. |
+| Deterministic science first | Rankings, reports, and Evidence Q&A work without any external model provider or API key. |
 
 ## 3. Runtime topology
 
@@ -96,7 +99,7 @@ apps/api/terrax/
     regions.py            preset + user regions
     jobs.py               job list/detail/events/cancel
     reports.py            generate/list/download/delete
-    assistant.py          grounded question endpoint
+    assistant.py          evidence Q&A endpoint
     media.py              real globe textures and regional previews
     terrain.py            real-DEM 3D mesh endpoint
     health.py             database + queue + configuration state
@@ -128,7 +131,7 @@ apps/api/terrax/
     queue.py              claim/retry/cancel/recover semantics
     handlers.py           analysis and report handlers
   reports/generator.py    PDF, CSV, GeoJSON, JSON, manifest
-  assistant.py            deterministic citation-grounded narrator
+  assistant.py            deterministic citation-grounded evidence responder
   results.py              read models for results and candidate detail
   terrain3d.py            DEM window → JSON height grid + provenance cache
   catalog.py              authoritative dataset registry
@@ -213,7 +216,7 @@ All routes are under `/api/v1`.
 | Regions | `GET/POST /regions`, `GET/DELETE /regions/{id}` |
 | Jobs | `GET /jobs`, `GET /jobs/{id}`, `/events`, `POST /jobs/{id}/cancel` |
 | Reports | `POST/GET /reports`, `GET /reports/{id}`, `/download`, `DELETE` |
-| Assistant | `POST /assistant/query` (deterministic, grounded, cited) |
+| Evidence Q&A | `POST /assistant/query` (deterministic, cited) |
 | Media | `GET /textures`, `/textures/{body}.jpg`, `/previews/{body}/{lon}/{lat}/{size}.jpg` |
 | Terrain | `GET /terrain/{body}/{lon}/{lat}/{size}.json?resolution_m=500` — real DEM height grid with source metadata |
 | Health | `GET /health` (database, queue, entity counts, credential state) |

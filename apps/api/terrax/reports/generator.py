@@ -231,7 +231,7 @@ def _geojson_bytes(payload: dict[str, Any]) -> bytes:
         )
     collection = {
         "type": "FeatureCollection",
-        "name": "TERRA-X analogue candidates",
+        "name": "SNSX SPACE analogue candidates",
         "terrax:spatial_reference": {
             "note": (
                 "GeoJSON has no standard planetary CRS. No collection-wide Earth CRS is "
@@ -250,7 +250,7 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
     styles = getSampleStyleSheet()
     styles.add(
         ParagraphStyle(
-            name="TerraTitle",
+            name="SnsxTitle",
             parent=styles["Title"],
             fontName="Helvetica-Bold",
             fontSize=20,
@@ -262,7 +262,7 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
     )
     styles.add(
         ParagraphStyle(
-            name="TerraH2",
+            name="SnsxH2",
             parent=styles["Heading2"],
             fontName="Helvetica-Bold",
             fontSize=12,
@@ -274,7 +274,7 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
     )
     styles.add(
         ParagraphStyle(
-            name="TerraBody",
+            name="SnsxBody",
             parent=styles["BodyText"],
             fontName="Helvetica",
             fontSize=9,
@@ -284,7 +284,7 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
     )
     styles.add(
         ParagraphStyle(
-            name="TerraSmall",
+            name="SnsxSmall",
             parent=styles["BodyText"],
             fontName="Helvetica",
             fontSize=7.5,
@@ -300,7 +300,7 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
         canvas.drawString(
             18 * mm,
             10 * mm,
-            "TERRA-X - planetary terrain analogue intelligence - not a landing-safety assessment",
+            "SNSX SPACE - planetary terrain analogue intelligence - not a landing-safety assessment",
         )
         canvas.drawRightString(192 * mm, 10 * mm, f"Page {doc.page}")
         canvas.restoreState()
@@ -313,20 +313,20 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
         topMargin=16 * mm,
         bottomMargin=16 * mm,
         title=_plain(payload["analysis"]["title"]),
-        author="TERRA-X",
+        author="SNSX SPACE",
         subject="Planetary analogue analysis",
     )
     story: list[Any] = []
     analysis = payload["analysis"]
     region = payload["reference_region"]
-    story.append(Paragraph("TERRA-X analogue analysis", styles["TerraTitle"]))
-    story.append(Paragraph(_ascii(analysis["title"]), styles["TerraH2"]))
+    story.append(Paragraph("SNSX SPACE analogue analysis", styles["SnsxTitle"]))
+    story.append(Paragraph(_ascii(analysis["title"]), styles["SnsxH2"]))
     story.append(
         Paragraph(
             f"Analysis <b>{analysis['id']}</b> | reference <b>{_ascii(region['name'])}</b> "
             f"({region['body_id']}) | algorithm {analysis['algorithm_version']} | "
             f"feature schema {analysis['feature_schema_version']}",
-            styles["TerraSmall"],
+            styles["SnsxSmall"],
         )
     )
     story.append(Spacer(1, 5))
@@ -336,28 +336,28 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
             "region with measured Earth terrain. Similarity is a bounded, configuration-dependent "
             "heuristic, not a probability. Confidence is reported separately from similarity. "
             "Missing dimensions are excluded and listed; they are never imputed as perfect matches.",
-            styles["TerraBody"],
+            styles["SnsxBody"],
         )
     )
 
     summary = analysis.get("result_summary") or {}
-    story.append(Paragraph("Run summary", styles["TerraH2"]))
+    story.append(Paragraph("Run summary", styles["SnsxH2"]))
     story.append(
         Paragraph(
             f"Ranked candidates: <b>{summary.get('candidate_count', len(payload['rankings']))}</b>. "
             f"Mean evidence confidence: <b>{summary.get('mean_confidence', 'n/a')}</b>. "
             f"Footprint: {region['size_km']} km. "
             f"Search bbox: {payload.get('dataset_manifest', {}).get('search', {}).get('bbox')}.",
-            styles["TerraBody"],
+            styles["SnsxBody"],
         )
     )
 
-    story.append(Paragraph("Reference region", styles["TerraH2"]))
+    story.append(Paragraph("Reference region", styles["SnsxH2"]))
     story.append(
         Paragraph(
             f"{_ascii(region['name'])} at {region['center_lon']:.4f}, {region['center_lat']:.4f} "
             f"on {region['body_id']}. {_ascii(region.get('description') or '')}",
-            styles["TerraBody"],
+            styles["SnsxBody"],
         )
     )
     dem = (payload.get("dataset_manifest", {}).get("reference") or {}).get("dem") or {}
@@ -366,11 +366,11 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
             f"Reference DEM: {_ascii(dem.get('title', 'n/a'))}; product {_ascii(dem.get('product_id', 'n/a'))}; "
             f"native resolution {dem.get('native_resolution_m', 'n/a')} m; vertical uncertainty "
             f"{dem.get('vertical_uncertainty_m', 'n/a')} m. {_ascii(dem.get('citation', ''))}",
-            styles["TerraSmall"],
+            styles["SnsxSmall"],
         )
     )
 
-    story.append(Paragraph("Rankings", styles["TerraH2"]))
+    story.append(Paragraph("Rankings", styles["SnsxH2"]))
     table_data = [["#", "Candidate", "Score", "Conf.", "Band", "Coverage", "Lon", "Lat"]]
     for row in payload["rankings"]:
         table_data.append(
@@ -406,14 +406,14 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
         Paragraph(
             "Scores are primary MCDA similarities. Confidence combines evidence coverage, feature "
             "coverage, valid pixels, source resolution, method agreement, and uncertainty.",
-            styles["TerraSmall"],
+            styles["SnsxSmall"],
         )
     )
 
     top = payload["rankings"][:5]
     if top:
         story.append(PageBreak())
-        story.append(Paragraph("Top candidate detail", styles["TerraH2"]))
+        story.append(Paragraph("Top candidate detail", styles["SnsxH2"]))
         for row in top:
             dims = row.get("dimension_scores") or {}
             methods = row.get("method_scores") or {}
@@ -421,7 +421,7 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
                 Paragraph(
                     f"{row['rank']}. {_ascii(row['display_name'])} - score {row['overall_score']:.3f}, "
                     f"confidence {row['confidence']:.3f} ({row['confidence_band']})",
-                    styles["TerraBody"],
+                    styles["SnsxBody"],
                 )
             )
             dimension_rows = [["Dimension", "Score", "Coverage", "Weight", "Features used"]]
@@ -460,7 +460,7 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
                         f"{name}={value:.3f}" if value is not None else f"{name}=n/a"
                         for name, value in methods.items()
                     ),
-                    styles["TerraSmall"],
+                    styles["SnsxSmall"],
                 )
             )
             missing = row.get("missing_dimensions") or []
@@ -471,12 +471,12 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
                         + "; ".join(
                             f"{m.get('dimension')} ({m.get('reason', 'unavailable')})" for m in missing
                         ),
-                        styles["TerraSmall"],
+                        styles["SnsxSmall"],
                     )
                 )
             story.append(Spacer(1, 5))
 
-        story.append(Paragraph("Evidence and citations", styles["TerraH2"]))
+        story.append(Paragraph("Evidence and citations", styles["SnsxH2"]))
         evidence = payload.get("evidence") or []
         by_dataset: dict[str, list[dict[str, Any]]] = {}
         for record in evidence:
@@ -487,40 +487,40 @@ def _pdf_bytes(payload: dict[str, Any]) -> bytes:
                 Paragraph(
                     f"<b>{_ascii(first['title'])}</b> ({len(records)} record(s)) - "
                     f"{_ascii(first['citation'])} Licence: {_ascii(first['license'])}.",
-                    styles["TerraBody"],
+                    styles["SnsxBody"],
                 )
             )
             urls = sorted({_ascii(r["source_url"]) for r in records})[:4]
             for url in urls:
-                story.append(Paragraph(_ascii(url), styles["TerraSmall"]))
+                story.append(Paragraph(_ascii(url), styles["SnsxSmall"]))
 
     story.append(PageBreak())
-    story.append(Paragraph("Datasets and provenance", styles["TerraH2"]))
+    story.append(Paragraph("Datasets and provenance", styles["SnsxH2"]))
     manifest = payload.get("dataset_manifest") or {}
     for dataset in manifest.get("datasets", []):
         story.append(
             Paragraph(
                 f"<b>{_ascii(dataset.get('dataset_id'))}</b> ({_ascii(dataset.get('role'))}) - "
                 f"{_ascii(dataset.get('citation') or '')}",
-                styles["TerraSmall"],
+                styles["SnsxSmall"],
             )
         )
-    story.append(Paragraph("Reproducibility", styles["TerraH2"]))
+    story.append(Paragraph("Reproducibility", styles["SnsxH2"]))
     repro = payload.get("reproducibility") or {}
     story.append(
         Paragraph(
             " | ".join(f"{_ascii(k)}: {_ascii(v)}" for k, v in repro.items()),
-            styles["TerraSmall"],
+            styles["SnsxSmall"],
         )
     )
-    story.append(Paragraph("Limitations", styles["TerraH2"]))
+    story.append(Paragraph("Limitations", styles["SnsxH2"]))
     for limitation in payload.get("limitations") or []:
-        story.append(Paragraph(f"- {_ascii(limitation)}", styles["TerraBody"]))
+        story.append(Paragraph(f"- {_ascii(limitation)}", styles["SnsxBody"]))
     context_errors = manifest.get("context_errors") or []
     if context_errors:
-        story.append(Paragraph("Context services that were unavailable", styles["TerraH2"]))
+        story.append(Paragraph("Context services that were unavailable", styles["SnsxH2"]))
         for error in context_errors:
-            story.append(Paragraph(f"- {_ascii(error)}", styles["TerraSmall"]))
+            story.append(Paragraph(f"- {_ascii(error)}", styles["SnsxSmall"]))
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()

@@ -1,4 +1,4 @@
-"""Shared fixtures for TERRA-X tests."""
+"""Shared fixtures for SNSX SPACE tests."""
 
 from __future__ import annotations
 

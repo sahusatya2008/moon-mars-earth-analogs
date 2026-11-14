@@ -11,7 +11,7 @@ export default function AppError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("TERRA-X page error", error);
+    console.error("SNSX SPACE page error", error);
   }, [error]);
 
   return (

@@ -1,7 +1,7 @@
 """PDS3 label parsing and raw image reading for LOLA/MOLA/TES products.
 
 PDS3 labels are deceptively simple key=value records with multi-line values. This parser
-handles the fields TERRA-X uses and preserves the original label alongside derived products.
+handles the fields SNSX SPACE uses and preserves the original label alongside derived products.
 """
 
 from __future__ import annotations

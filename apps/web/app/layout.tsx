@@ -4,9 +4,9 @@ import { Footer } from "@/components/Footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TERRA-X · Planetary analogue intelligence",
+  title: "SNSX SPACE · Planetary analogue intelligence",
   description:
-    "Find Earth terrain analogues for Moon and Mars regions using authoritative NASA, USGS, ESA, and Copernicus data. Transparent similarity, separate confidence, inspectable provenance.",
+    "NASA Space Apps Challenge 2026: Identify Earth Locations that Analog the Permanent Moon Base Locations and Mars. SNSX SPACE uses authoritative NASA, USGS, ESA, and Copernicus data with transparent similarity, separate confidence, and inspectable provenance.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

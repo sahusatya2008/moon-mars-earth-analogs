@@ -115,12 +115,16 @@ export default async function MethodologyPage() {
           <div className="eyebrow">Methodology · version 0.4.0</div>
           <h2>Transparent by construction</h2>
           <p style={{ marginTop: 10, maxWidth: 820 }}>
-            TERRA-X measures terrain, not appearances. The reference window and each Earth
+            SNSX SPACE measures terrain, not appearances. The reference window and each Earth
             candidate are reduced to the same physical footprint and grid before any comparison.
             Similarity and confidence are computed separately, every tolerance is declared in
             advance, and unavailable evidence stays visible as unavailable. Weather context from
             Meteomatics is reported beside candidate evidence when credentials are configured; it
             never enters the similarity score or confidence.
+          </p>
+          <p style={{ marginTop: 10, maxWidth: 820, color: "var(--cyan)" }}>
+            NASA Space Apps Challenge 2026 · Identify Earth Locations that Analog the Permanent
+            Moon Base Locations and Mars.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -420,7 +424,7 @@ export default async function MethodologyPage() {
             </div>
           </div>
           <div className="callout" style={{ marginTop: 18 }}>
-            <b>Scope.</b> TERRA-X ranks terrain analogues under an explicit configuration. It does
+            <b>Scope.</b> SNSX SPACE ranks terrain analogues under an explicit configuration. It does
             not model geology, mineralogy, radiation, dust, thermal cycling, illumination, or
             mission operations, and it does not recommend landing sites.{" "}
             <Link className="link" href="/datasets">See the source catalog</Link> for the products

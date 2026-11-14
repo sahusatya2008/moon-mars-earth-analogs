@@ -48,6 +48,23 @@ def test_payload_preserves_missing_cells_and_statistics():
     assert "NaN" not in json.dumps(payload, allow_nan=False)
 
 
+def test_payload_describes_real_imagery_drape():
+    payload = _window_to_payload(
+        _window(),
+        body_id="moon",
+        lon=-47.4,
+        lat=25.4,
+        size_km=40.0,
+        source={"dataset_id": "lro_lola_ldem_128ppd", "product_id": "test", "citation": "test"},
+    )
+    imagery = payload["imagery"]
+    assert imagery["available"] is True
+    assert imagery["dataset_id"] == "lro_wac_mosaic"
+    assert imagery["url"].startswith("/api/v1/previews/moon/-47.40000/25.40000/40.0.jpg")
+    assert "display only" in imagery["role"]
+    assert "never used as geometry" in payload["note"]
+
+
 def _zero_window() -> GriddedWindow:
     values = np.zeros((2, 2), dtype=np.float32)
     return GriddedWindow(

@@ -483,7 +483,7 @@ function AssistantPanel({ analysisId }: { analysisId: string }) {
       const response = await api.assistant({ analysis_id: analysisId, question });
       setAnswer(response);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Assistant request failed.");
+      setError(err instanceof ApiError ? err.message : "Evidence request failed.");
     } finally {
       setBusy(false);
     }
@@ -493,10 +493,10 @@ function AssistantPanel({ analysisId }: { analysisId: string }) {
     <div className="panel panel-pad">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
         <div>
-          <div className="eyebrow cyan">Grounded assistant</div>
+          <div className="eyebrow cyan">Evidence Q&amp;A</div>
           <h3 style={{ marginTop: 7, fontSize: 17 }}>Ask the stored evidence</h3>
         </div>
-        <span className="chip idle">{answer?.provider || "deterministic"}</span>
+        <span className="chip idle">cited evidence</span>
       </div>
       <form onSubmit={ask} style={{ display: "grid", gap: 8, marginTop: 14 }}>
         <textarea

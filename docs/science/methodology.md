@@ -1,6 +1,9 @@
-# TERRA-X Scientific Methodology
+# SNSX SPACE Scientific Methodology
 
 **Version:** 0.4.0 · algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.4.0`
+
+**Challenge:** NASA Space Apps Challenge 2026 — *Identify Earth Locations that Analog the Permanent
+Moon Base Locations and Mars*
 
 This document describes what the code actually computes. Declared constants are in
 `apps/api/terrax/engine/features.py` and `apps/api/terrax/engine/similarity.py`; each completed run
@@ -11,7 +14,7 @@ also persists its own configuration, weights, manifest, and per-feature values.
 An analogue is a *multidimensional, evidence-weighted similarity under a stated configuration*. It
 is not an identity claim, a probability, a geological map, or a landing-safety assessment.
 
-TERRA-X reports three different things separately:
+SNSX SPACE reports three different things separately:
 
 - **similarity** — how close a candidate's measured physical feature vector is to the reference;
 - **confidence** — how complete, valid, resolved, and method-consistent the evidence is;

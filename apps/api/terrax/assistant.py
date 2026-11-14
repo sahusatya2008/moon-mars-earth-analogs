@@ -1,8 +1,8 @@
-"""Deterministic, citation-grounded research assistant.
+"""Deterministic, citation-grounded evidence responder.
 
 The default answer is assembled from persisted records only. It cannot invent a score, a place
-name, or a dataset. An optional LLM can be enabled later, but the deterministic path is always
-available and is what the UI labels as grounded.
+name, or a dataset. An optional external model provider can be enabled later, but the built-in
+path is always available and is what the UI labels as cited evidence.
 """
 
 from __future__ import annotations
@@ -268,7 +268,7 @@ def answer_question(
         regions = int(db.scalar(select(func.count()).select_from(PlanetaryRegion)) or 0)
         analyses = int(db.scalar(select(func.count()).select_from(AnalysisExecution)) or 0)
         answer = (
-            "TERRA-X measures a lunar or Martian reference region from an authoritative DEM, screens "
+            "SNSX SPACE measures a lunar or Martian reference region from an authoritative DEM, screens "
             "real Earth terrain, refines candidates with Copernicus GLO-30 on a common 500 m grid, "
             "and ranks multidimensional similarity separately from evidence confidence. "
             f"This deployment currently has {datasets} catalogued datasets, {regions} reference regions, "

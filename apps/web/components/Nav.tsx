@@ -15,9 +15,9 @@ export function Nav() {
   return (
     <header className="nav">
       <div className="shell nav-inner">
-        <Link href="/" className="brand" aria-label="TERRA-X home">
+        <Link href="/" className="brand" aria-label="SNSX SPACE home">
           <span className="brand-mark" />
-          TERRA-X
+          SNSX SPACE
         </Link>
         <nav className="nav-links" aria-label="Primary">
           {LINKS.map((link) => (
@@ -33,7 +33,7 @@ export function Nav() {
         </nav>
         <div className="nav-status">
           <span className="dot" style={{ color: "var(--cyan)" }} />
-          Planetary analogue intelligence
+          NASA Space Apps 2026
         </div>
       </div>
     </header>

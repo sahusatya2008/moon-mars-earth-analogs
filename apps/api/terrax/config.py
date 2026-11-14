@@ -1,4 +1,4 @@
-"""TERRA-X configuration. Every secret is optional; the core DEM workflow has no paid dependency."""
+"""SNSX SPACE configuration. Every secret is optional; the core DEM workflow has no paid dependency."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     terrax_admin_api_key: str | None = None
     terrax_allow_anonymous_admin: bool = False
     terrax_rate_limit_per_minute: int = 120
-    terrax_gazetteer_user_agent: str = "TERRA-X/0.1 (planetary analogue research)"
+    terrax_gazetteer_user_agent: str = "SNSX-SPACE/0.1 (planetary analogue research)"
 
     terrax_worker_poll_seconds: float = 1.0
     terrax_job_max_attempts: int = 3
@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     default_screening_grid_km: float = 5.0
     default_cluster_radius_km: float = 100.0
     http_timeout_seconds: float = 60.0
-    http_user_agent: str = "TERRA-X/0.1 (NASA Space Apps planetary analogue research)"
+    http_user_agent: str = "SNSX-SPACE/0.1 (NASA Space Apps planetary analogue research)"
 
     @property
     def cache_dir(self) -> Path:

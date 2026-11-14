@@ -71,8 +71,8 @@ export function TerrainModelPanel({
           <h3>Every surface as a real elevation mesh</h3>
           <p>
             The reference and every ranked Earth candidate are sampled from the same DEM
-            products used by the analysis. These are geometry models, not reference photos or
-            decorative textures.
+            products used by the analysis. Real NASA imagery is draped over the measured
+            geometry for display only and never contributes to elevation or scoring.
           </p>
         </div>
         <span className="chip idle">{targets.length} surfaces</span>
