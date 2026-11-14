@@ -30,6 +30,8 @@ products used by the analysis; reference imagery is used for globes, never as te
    confidence.
 5. **Inspect** — the workspace exposes dimensions, feature deltas, kernels, missing dimensions,
    method scores, source citations, product resolution, valid-pixel fractions, and limitations.
+   Independent Planetary Computer cross-checks add NASADEM and ALOS DEM error statistics, IO LULC
+   agreement with WorldCover, and Sentinel-2/Landsat scene previews as context-only evidence.
 6. **Render** — every reference window and every ranked Earth candidate is also available as a real
    3D elevation mesh sampled from the stored DEM, with source provenance and valid-data coverage.
 7. **Export** — PDF, CSV, GeoJSON, JSON, and a reproducibility manifest generated from stored rows.
@@ -85,7 +87,7 @@ docker compose up --build
 - PostGIS: `localhost:5434`
 
 The API container applies migrations and idempotently seeds the catalog before starting, so a fresh
-volume comes up with all 16 datasets and 9 preset regions. The worker waits for API health, then
+volume comes up with all 21 datasets and 9 preset regions. The worker waits for API health, then
 claims jobs. An optional Redis profile exists but is not used by the default queue.
 
 ## Local development
@@ -204,8 +206,16 @@ data/              local cache and generated reports (not committed)
 
 USGS Astrogeology LRO LOLA and MGS MOLA, Copernicus DEM GLO-30, AWS Terrain Tiles
 (Mapzen/Tilezen), NASA GIBS and CMR, ESA WorldCover, Sentinel-2 L2A via Earth Search, OpenStreetMap
-Nominatim, and optional NASA FIRMS. Every catalog entry carries its own agency, citation, license,
-resolution, access protocol, and live-availability state.
+Nominatim, and optional NASA FIRMS. Microsoft Planetary Computer adds NASADEM HGT v001, ALOS
+World 3D-30m, Impact Observatory annual LULC V2, Sentinel-2 L2A, and Landsat Collection 2 Level-2.
+Every catalog entry carries its own agency, citation, license, resolution, access protocol, and
+live-availability state.
+
+Planetary Computer raster assets are private Azure blobs. TERRA-X obtains a short-lived public SAS
+token per collection, appends it only for `*.blob.core.windows.net` reads, and never writes signed
+URLs or tokens to evidence, manifests, reports, or logs. The STAC metadata and unsigned preview
+links remain public and citable. These collections are cross-checks and optical context; Copernicus
+GLO-30 remains the only Earth DEM used for scoring.
 
 The delivery environment reaches these archives at roughly 100 KB/s. The design therefore reads
 windows and small ranges, caches them, and avoids bulk downloads. Large archives and credential-
@@ -220,29 +230,41 @@ marks, and nothing in this repository implies endorsement by those agencies.
 
 ## Verification
 
-Executed on 2026-11-13, with the container checks below run on 2026-11-14:
+Executed on 2026-11-13, with the Planetary Computer and container checks run on 2026-11-14:
 
-- backend: **56 passed**, 3 non-failing warnings; Ruff clean;
+- backend: **68 passed**, 3 non-failing warnings, including 12 dedicated Planetary Computer tests;
+  Ruff clean;
 - frontend: TypeScript clean and production build passed, including `/terrain`;
 - canonical Moon run `0f81536a-fd92-4e90-80be-558679889b59`: 68 coarse samples, 3/3 refinements
   succeeded, 3 candidates, top similarity **0.789007** with **0.904513** high confidence;
-- five reports generated, re-downloaded, and SHA-256 matched;
-- 3D terrain: 2 landing meshes, 4 workspace surfaces, and 14 distinct surfaces in `/terrain`
-  rendered real DEM geometry; all curated terrain requests returned HTTP 200 with no console
-  errors; an ocean/void coordinate now returns HTTP 422 instead of a flat 0 m mesh;
+- Planetary Computer run `58500974-41e1-4649-9a0a-adcb9f4f126e` with catalog **0.3.0**: all five
+  collections attached as context-only evidence with no context errors. NASADEM and ALOS
+  cross-checked Copernicus over 6,400/6,400 cells (MAE **0.8688 m** and **2.0044 m**); IO LULC
+  agreement with WorldCover was **0.23266** and is reported as disagreement; Sentinel-2 and
+  Landsat returned 3 scenes each (cloud **0.500184%** and **9.14%**);
+- live Planetary Computer probes: all five collections `available`; catalog probe returned
+  **20 available, 1 credential-gated, 0 unavailable**;
+- five reports generated for the Planetary Computer run, re-downloaded, and SHA-256 matched; no
+  `sig=` or `<sas>` appeared in any export or in API/worker logs;
+- 3D terrain: 2 landing meshes, 4 workspace surfaces, and **17** distinct surfaces in `/terrain`
+  rendered real DEM geometry; all eight Earth candidate surfaces returned 6,400/6,400 Copernicus
+  cells; an ocean/void coordinate now returns HTTP 422 instead of a flat 0 m mesh;
 - GeoJSON reports no longer apply an Earth CRS to Moon/Mars features; per-feature spatial
   reference metadata is emitted instead;
 - CORS local-origin handling and the root hydration attribute warning were fixed and
   browser-verified;
-- browser checks covered rankings, candidate comparison, reports, assistant, SSE progress, the
-  no-WebGL fallback, and SwiftShader software-WebGL globe and terrain renders;
+- browser checks covered rankings, candidate comparison, reports, assistant, SSE progress,
+  Planetary Computer evidence metrics/previews, the no-WebGL fallback, and SwiftShader
+  software-WebGL globe and terrain renders;
 - **containerized stack verified**: API, worker, and web images built from the committed
-  Dockerfiles; a fresh PostGIS volume applied migrations and auto-seeded 16 datasets and
-  9 regions; the API became healthy; Moon, Mars, and Earth terrain requests each returned
-  80×80 real DEM cells; analysis `cf632ae1-7ee5-499c-af80-16e686a0d97e` ran through the
-  containerized worker to 3 candidates (top similarity **0.791431**, confidence **0.876997**);
-  GeoJSON report `21adf2b8-a66c-4a57-a623-5bdd086cb984` had no collection-wide CRS and
-  per-feature spatial references. The run used isolated ports `15434`/`18000`/`13000`.
+  Dockerfiles (189 MB, 189 MB, 77.5 MB); a fresh PostGIS volume applied migrations and
+  auto-seeded **21 datasets** and 9 regions; the API became healthy at version `0.3.0`; Moon,
+  Mars, and Earth terrain requests each returned 80×80 real DEM cells; analysis
+  `82edb848-423c-4d73-a418-f4d16366f3b1` ran through the containerized worker to 3 candidates
+  (top similarity **0.734385**, confidence **0.700000**) with NASADEM/ALOS/LULC/Sentinel-2/Landsat
+  evidence; all five reports matched their checksums and GeoJSON report
+  `7e614407-9bd6-412f-8d84-77d3314b3d0c` had no collection-wide CRS and per-feature spatial
+  references. The run used isolated ports `15434`/`18000`/`13000`.
 - the CI workflow is committed and YAML-validated but has not executed on GitHub (no remote
   configured).
 

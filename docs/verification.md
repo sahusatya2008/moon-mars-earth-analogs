@@ -1,7 +1,9 @@
 # TERRA-X Verification Report
 
-**Executed:** 2026-11-13 (local session); container stack 2026-11-14  
-**Version:** algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.2.0`  
+**Executed:** 2026-11-13 (local session); Planetary Computer and container checks 2026-11-14
+
+**Version:** algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.3.0`
+
 **Environment:** macOS, Python 3.12 virtualenv, Node 22, PostgreSQL/PostGIS on `localhost:5434`,
 FastAPI on `:8000`, one worker, Next.js on `:3000`; Docker Compose end-to-end on `15434`/`18000`/`13000`.
 
@@ -13,12 +15,12 @@ without a command and observed result.
 
 | Check | Command | Observed result |
 |---|---|---|
-| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **56 passed, 3 warnings** |
+| Backend tests | `DATABASE_URL=.../terrax_test .venv/bin/pytest -q` | **68 passed, 3 warnings** |
 | Backend lint | `.venv/bin/ruff check terrax tests` | **All checks passed** |
 | Frontend types | `npm run typecheck` | **Passed** (`tsc --noEmit`, no diagnostics) |
 | Frontend production build | `npm run build` | **Passed**; `/`, `/analyses`, `/terrain`, `/datasets`, `/methodology`, and dynamic `/analyses/[id]` emitted |
 | Compose syntax | `docker compose config` | **Exit 0**, rendered configuration accepted |
-| Docker image build | `docker compose ... build` | **Passed**; API **832 MB**, worker **832 MB**, web **304 MB** |
+| Docker image build | `docker compose ... build` | **Passed**; API **189 MB**, worker **189 MB**, web **77.5 MB** (catalog-0.3.0 rebuild) |
 | Compose end-to-end | isolated-port stack + `verify_compose.py` | **All checks passed** (see 1.1) |
 
 The three warnings are non-failing:
@@ -39,33 +41,66 @@ degenerate mesh, and route validation for unsupported bodies, invalid coordinate
 footprints. The report tests assert that GeoJSON does not apply a collection-wide Earth CRS to
 Moon/Mars features. Config tests assert that the repository root resolves correctly in both the
 checkout layout (`<repo>/apps/api/terrax/config.py`) and the container layout
-(`/app/terrax/config.py`). The observed count in this session was **56 passed**.
+(`/app/terrax/config.py`). The observed count in this session was **68 passed**.
+
+Twelve dedicated Planetary Computer tests cover SAS signing restricted to Azure blob hosts,
+token redaction, cached token refresh, antimeridian splitting and item de-duplication, DEM
+difference statistics with missing cells, LULC year selection, WorldCover/IO LULC broad-class
+agreement, optical search retry without a cloud filter, probe states, and registration of all
+five collections as Earth context-only datasets. These use synthetic HTTP/raster fixtures; live
+Planetary Computer access is reported separately in 1.2 and 2.4.
 
 ### 1.1 Containerized Compose run (2026-11-14)
 
-Images were built from the committed Dockerfiles: API **832 MB**, worker **832 MB**, web
-**304 MB**. `rasterio`'s manylinux wheel links `libexpat.so.1`, which `python:3.12-slim` omits, so
-the API runtime stage installs `libexpat1`; `python -c "import terrax.main"` now succeeds inside
-the image with `REPO_ROOT=/app`.
+The catalog-0.3.0 stack was rebuilt from the committed Dockerfiles with a fresh PostGIS volume.
+Images measured: API **189 MB**, worker **189 MB**, web **77.5 MB** (uncompressed arm64 images).
+`rasterio`'s manylinux wheel links `libexpat.so.1`, which `python:3.12-slim` omits, so the API
+runtime stage installs `libexpat1`; `python -c "import terrax.main"` succeeds inside the image
+with `REPO_ROOT=/app`.
 
 The stack used isolated host ports—PostGIS `15434`, API `18000`, web `13000`—so an existing local
 development stack on `5434`/`8000`/`3000` stayed untouched. Its database volume was empty before
-the run.
+the run. An earlier build (catalog 0.2.0, 16 datasets, analysis
+`cf632ae1-7ee5-499c-af80-16e686a0d97e`) passed the same checks; this rerun supersedes it.
 
 | Check | Observed result |
 |---|---|
-| Startup | initial migration `0697627b9ac4` applied; seed logged `{'planets': 3, 'datasets': 16, 'regions': 9}`; API became healthy |
-| Catalog | `/health` returned `status=ok`, `database=ok`, **16** datasets, **9** regions |
-| Web | landing returned HTTP 200 and contained the non-affiliation notice |
+| Startup | initial migration `0697627b9ac4` applied; seed logged `{'planets': 3, 'datasets': 21, 'regions': 9}`; API became healthy |
+| Catalog | `/health` returned `status=ok`, `database=ok`, version `0.3.0`, **21** datasets, **9** regions |
+| Web | landing returned HTTP 200 and contained the non-affiliation notice; headless Chrome rendered **21** catalog products and the Planetary Computer evidence panel |
 | Moon terrain | `lro_lola_ldem_128ppd`, 80×80, **6,400/6,400** valid, −2,548.0 to −560.5 m |
 | Mars terrain | `mgs_mola_megdr_463m`, 80×80, **6,400/6,400** valid, −3,444.4 to 761.0 m |
-| Earth terrain | `copernicus_dem_glo30`, 80×80, **6,400/6,400** valid, 1,031.9 to 2,663.7 m |
-| Analysis | `cf632ae1-7ee5-499c-af80-16e686a0d97e` succeeded through the containerized worker; **3** candidates; top **Provincia de Antofagasta, Antofagasta Region, Chile**, similarity **0.791431**, confidence **0.876997** (high) |
-| GeoJSON | report `21adf2b8-a66c-4a57-a623-5bdd086cb984`, 6,029 bytes, no collection-wide `crs`, **4** features with `spatial_reference` |
+| Earth terrain | `copernicus_dem_glo30`, 80×80, **6,400/6,400** valid, 1,234.1 to 2,476.6 m |
+| Analysis | `82edb848-423c-4d73-a418-f4d16366f3b1` succeeded through the containerized worker; **3** candidates; top **Provincia de Antofagasta, Antofagasta Region, Chile**, similarity **0.734385**, confidence **0.700000** (moderate); **no context errors** |
+| Planetary Computer | containerized worker attached NASADEM (MAE **0.8688 m**), ALOS (MAE **2.0044 m**), IO LULC (agreement **0.23266**), Sentinel-2 (cloud **0.500184%**), and Landsat (cloud **9.14%**); unsigned previews rendered in the web container |
+| Reports | JSON, manifest, GeoJSON, CSV, and PDF all `ready`; downloaded SHA-256 matched; no `sig=` or `<sas>` leak |
+| GeoJSON | report `7e614407-9bd6-412f-8d84-77d3314b3d0c`, 6,015 bytes, no collection-wide `crs`, **4** features with `spatial_reference` |
 
-The worker also made live requests during the run: AWS Earth Search returned HTTP 200 and NASA
-GIBS returned HTTP 200, so refinement and context fetching were exercised over the network, not
-only from the local cache.
+The worker made live network requests during the run: Planetary Computer STAC, SAS signing, and
+signed window reads succeeded; Earth Search and NASA GIBS also returned HTTP 200. The API and
+worker logs contained no SAS token or signed query string. This exercises refinement and evidence
+fetching over the network inside the containers, not only from the local cache.
+
+### 1.2 Live Planetary Computer connector checks (2026-11-14)
+
+The five collections were exercised directly against
+`https://planetarycomputer.microsoft.com/api/stac/v1`, not only through fixtures. The connector
+obtained a public SAS token, signed only Azure blob URLs, and read bounded windows at an Atacama
+test site (`25.0°S, 70.2°W`, 40 km):
+
+| Check | Observed result |
+|---|---|
+| NASADEM HGT v001 vs Copernicus GLO-30 | bias **+0.2223 m**, MAE **0.8989 m**, RMSE **1.1097 m**, Pearson r **0.999991**, **6,400/6,400** overlapping cells |
+| ALOS World 3D-30m vs Copernicus GLO-30 | bias **+3.0964 m**, MAE **3.0969 m**, RMSE **3.2556 m**, Pearson r **0.999993**, **6,400/6,400** overlapping cells |
+| IO LULC 2023 | 57.079% bare ground, 42.921% rangeland; WorldCover 2021 at the same window was 99.799% bare; broad-class agreement **0.57261** |
+| Sentinel-2 L2A | **3** scenes; lowest cloud cover **0.500184%** (`S2B_MSIL2A_20261113T143649_R096_T19JDN_20261113T181914`) |
+| Landsat C2 L2 | **3** scenes; lowest cloud cover **6.83%** (`LC09_L2SP_001077_20261024_02_T1`) |
+| Probes | all five collections returned `available` with public STAC metadata and a SAS token |
+
+`POST /api/v1/datasets/probe?limit=100` returned **20 available, 1 credential-gated
+(`firms_viirs`), 0 unavailable**. The gated service was not reported as connected. API and worker
+logs, and all report exports from the run below, were searched for `sig=` and `<sas>`; no token or
+signed query string was found.
 
 ## 2. Completed scientific runs
 
@@ -153,6 +188,48 @@ Two defects were found and fixed during this verification:
    `job_type = "analysis"`. A regression test creates a newer report job and asserts that the
    analysis job still owns status and events.
 
+### 2.4 Planetary Computer cross-check run — Aristarchus Plateau
+
+This run exercised the full catalog-0.3.0 pipeline through the local API and worker, including
+all five Planetary Computer collections as evidence.
+
+| Field | Value |
+|---|---|
+| Analysis ID | `58500974-41e1-4649-9a0a-adcb9f4f126e` |
+| Title | Planetary Computer live verification |
+| Reference | Aristarchus Plateau, Moon, `25.40°N, 47.40°W` |
+| Footprint / grid | 40 km / 500 m |
+| Earth search bbox | `[-70.5, -25.5, -68.5, -23.5]`, seed 42 |
+| Screening / refinement | **26** coarse samples, **4** sites attempted, **4 succeeded**, **0 failed** |
+| Status | `succeeded`, progress 1.0, **no context errors** |
+| Manifest | catalog `0.3.0`, **10** datasets: 2 scoring DEMs and 8 context/evidence products |
+
+| Rank | Candidate ID | Center | Similarity | Confidence | Band | Coverage |
+|---:|---|---|---:|---:|---|---:|
+| 1 | `e4004e13-a5d2-4c1e-8be8-305b91997e3c` | `25.30°S, 69.90°W` | **0.734385** | 0.700000 | moderate | 1.0 |
+| 2 | `3ff8b704-ff6a-4233-963b-2c99ec01f93b` | `24.10°S, 68.70°W` | 0.651816 | 0.700000 | moderate | 1.0 |
+| 3 | `1f7eb49c-690a-4022-8692-e173b9f3816e` | `23.70°S, 69.90°W` | 0.641907 | 0.550000 | moderate | 1.0 |
+
+The cross-candidate mean method standard deviation was **0.176128**. This run used a different
+`refine_top_n` (5) from the canonical run, so its top similarity is not directly comparable to the
+earlier 0.789007 result; it is an independent execution, not a revised score.
+
+Stored evidence for the top candidate:
+
+| Product | Observed result |
+|---|---|
+| NASADEM HGT v001 | bias **+0.7250 m**, MAE **0.8688 m**, RMSE **1.1212 m**, median **+0.6310 m**, p95 absolute deviation **2.3119 m**, r **0.999992**, **6,400/6,400** cells |
+| ALOS World 3D-30m | bias **+2.0033 m**, MAE **2.0044 m**, RMSE **2.1305 m**, median **+2.0225 m**, p95 absolute deviation **3.1986 m**, r **0.999994**, **6,400/6,400** cells |
+| IO LULC 2023 | **76.76%** rangeland, **23.232%** bare ground, **0.004%** crops; WorldCover 2021 at the same window was **99.964%** bare; broad-class agreement **0.23266** |
+| Sentinel-2 L2A | **3** scenes; selected scene `S2B_MSIL2A_20261113T143649_R096_T19JDN_20261113T181914`, cloud **0.500184%**, platform Sentinel-2B |
+| Landsat C2 L2 | **3** scenes; selected scene `LC09_L2SP_001078_20261024_02_T1`, cloud **9.14%**, platform Landsat-9 |
+
+The WorldCover and IO LULC products disagree strongly at this window. The disagreement is stored
+and displayed as **23% agreement**, not hidden or resolved in favour of either product. The two
+DEMs agree closely with Copernicus in this window, but that is an independent cross-check only:
+vertical datums, acquisition epochs, and surface definitions differ, so it is not a product
+accuracy assessment.
+
 ## 3. Report exports
 
 Five reports were generated for the canonical Moon run and downloaded again for independent
@@ -170,6 +247,23 @@ The downloaded PDF is a valid 4-page PDF 1.4 document. The GeoJSON is a `Feature
 4 features (3 candidates and the reference window). The CSV has one header plus 3 candidate rows.
 The JSON and manifest parse as JSON; the manifest contains analysis, reference region, candidate
 IDs, dataset manifest, evidence records, limitations, and reproducibility blocks.
+
+### 3.1 Planetary Computer run exports
+
+Five reports were generated for analysis `58500974-41e1-4649-9a0a-adcb9f4f126e`, re-downloaded,
+and checked for checksum integrity and SAS-token leakage.
+
+| Format | Report ID | Bytes | SHA-256 (downloaded bytes) | Check |
+|---|---|---:|---|---|
+| JSON | `1616b9a3-85b4-4f10-b7b9-c16783bb5c0e` | 131,406 | `18410eb9d76c386c714eed33b6439d5db526742b11447128dafd33e28b51e5f9` | match · no `sig=` · no `<sas>` |
+| Manifest | `e99aa802-1872-41fb-b90f-dcfcce004f97` | 86,903 | `61d865710916500443bebf04a1f67f6462c70fd922a06a3cf93b11b5b9b21e9d` | match · no `sig=` · no `<sas>` |
+| GeoJSON | `af0c4699-0ed8-4037-a351-61eb82bec935` | 6,015 | `4ef7a46100242b56a986f9974985bcaace58bda5c9eae11a5e2e87b14b8ee4e6` | match · no `sig=` · no `<sas>` |
+| CSV | `0832f3d9-38ad-4e0a-928a-557a05e0ab3d` | 1,832 | `9e03c6985f11b1dd04b1fc4e4f74c5e0cf2e82d72e4e0f6951dff56f31c1bdcc` | match · no `sig=` · no `<sas>` |
+| PDF | `62352f37-8034-4cc6-861d-88736341ed02` | 10,897 | `392a8e4a1e87437ae90ac0dc2b52545b2dbed45e1f6724d2529423a167b626b4` | match · no `sig=` · no `<sas>` |
+
+The GeoJSON has **4** features and **no top-level `crs`**; its per-feature `body_id` values are
+`earth` and `moon`. The JSON export contains the NASADEM/ALOS statistics, IO LULC agreement,
+Sentinel-2/Landsat scene metadata, and unsigned preview URLs, but no signed query parameter.
 
 ## 4. Assistant
 
@@ -200,15 +294,16 @@ The running production build was inspected through headless Chrome at 1600 px wi
 | Report panel | 5 ready formats and 5 download links; downloads checksum-verified |
 | Assistant | Cited answer renders with 6 citations |
 | SSE progress | Live stage/progress/events render; terminal transition succeeds |
-| Data observatory | Catalog filter, scoring-input filter, body groups, and live probe controls render |
+| Data observatory | **21** products render (**15 Earth, 3 Moon, 3 Mars**), including all five Planetary Computer collections; catalog filter, scoring-input filter, body groups, and live probe controls render |
+| Planetary Computer evidence | Top candidate shows **8** evidence records, including NASADEM/ALOS DEM metrics, IO LULC agreement, and Sentinel-2/Landsat scene context; unsigned preview `<img>` URLs load HTTP 200 `image/png` |
 | Methodology | Declared formulas, weights, tolerances, and limitations render |
 | Missing WebGL | Globe shows the real equirectangular source texture and an explicit fallback label |
 | 3D globe (SwiftShader) | Landing and workspace globes render the real NASA Earth texture, candidate pin, and body tabs; **no console errors** |
 | 3D terrain landing | Two real DEM meshes render: Aristarchus (LOLA) and the top Atacama candidate (Copernicus); **no terrain error** |
 | 3D terrain workspace | Four selectable surfaces render: reference plus all three Earth candidates; each tab requests the real DEM mesh |
-| 3D terrain explorer | `/terrain` lists **14 distinct surfaces** (5 Earth, 4 Moon, 5 Mars); body filters and search work; all selected meshes render |
+| 3D terrain explorer | `/terrain` lists **17 distinct surfaces** (8 Earth, 4 Moon, 5 Mars); body filters and search work; all selected meshes render |
 | Terrain exaggeration | Display slider changed from `×2.0` to `×3.5`; canvas remained live with no error |
-| Mobile layout (390 px) | Nav links remain visible, `/terrain` stacks to one column, 14 entries and a terrain canvas render, and the document has no horizontal overflow |
+| Mobile layout (390 px) | Nav links remain visible, `/terrain` stacks to one column, 17 entries and a terrain canvas render, and the document has no horizontal overflow |
 
 Two headless Chrome modes were used. The default headless instance had GPU/WebGL disabled and
 logged Three.js `A WebGL context could not be created` messages; the application caught the
@@ -217,6 +312,20 @@ A second instance launched with SwiftShader software WebGL (`--use-gl=angle
 --use-angle=swiftshader`) rendered the textured Three.js globes on the landing page and in the
 workspace, with **no console errors** in either capture. Drag/zoom interaction was not scripted;
 the render path itself is verified. A hardware-GPU browser was not available.
+
+The Planetary Computer UI pass used the default headless instance. `/datasets` rendered all 21
+catalog rows and the SAS-access explanation. Workspace
+`/analyses/58500974-41e1-4649-9a0a-adcb9f4f126e` auto-selected the top candidate and rendered:
+
+- ALOS cross-check: **MAE 2.00 m**, RMSE 2.13 m, bias +2.00 m across 6,400 cells;
+- NASADEM cross-check: **MAE 0.87 m**, RMSE 1.12 m, bias +0.72 m across 6,400 cells;
+- IO LULC agreement: **23%** with WorldCover, with the taxonomy/epoch caveat;
+- Landsat: cloud **9.1%**, 3 scenes, `landsat-9`;
+- Sentinel-2: cloud **0.5%**, 3 scenes, `Sentinel-2B`;
+- both unsigned preview URLs returned HTTP 200 `image/png` (2,184,434 and 1,204,885 bytes).
+
+The rendered metrics and previews came from persisted evidence records, not client-side
+recomputation.
 
 ### 5.1 Real 3D terrain
 
@@ -239,12 +348,14 @@ curl -s -D - -o /dev/null \
 ```
 
 The browser loaded 2 real DEM meshes on the landing page, 4 surfaces in the canonical workspace,
-and 14 distinct surfaces in `/terrain` (5 Earth candidates, 4 Moon regions, 5 Mars regions). Body
+and 17 distinct surfaces in `/terrain` (8 Earth candidates, 4 Moon regions, 5 Mars regions). Body
 filters, search, surface switching, and the display-only vertical-exaggeration control were
 exercised; every terrain request returned HTTP 200, no `.terrain-error` appeared, and the console
-was clean. Geometry is elevation only: no imagery texture is used, missing cells stay `null`, and
-triangles touching a missing cell are omitted. The unit tests assert strict JSON `null` handling
-and cache round trips.
+was clean. All eight Earth candidate surfaces were also requested directly after the Planetary
+Computer run: each returned an 80×80 Copernicus grid with **6,400/6,400** valid cells and elevations
+between 613.5 m and 4,294.9 m. Geometry is elevation only: no imagery texture is used, missing
+cells stay `null`, and triangles touching a missing cell are omitted. The unit tests assert strict
+JSON `null` handling and cache round trips.
 
 ### 5.2 CORS and hydration fixes
 
@@ -263,12 +374,15 @@ Screenshots in `docs/media/` were captured from these running services:
 - `landing.png`, `terrain.png`, `datasets.png`, `methodology.png`, `workspace.png`,
   `progress.png`.
 
-`landing.png` is the SwiftShader render with the real Earth texture, 16 datasets, 9 reference
-regions, 9 stored analyses, the latest Aristarchus run, and the start of the real 3D terrain
-section. `workspace.png` is the canonical Moon run with the four-surface 3D terrain panel, all five
-reports ready, and a cited assistant answer. `terrain.png` is the `/terrain` explorer showing all
-14 surfaces and a real Moon LOLA mesh. `progress.png` is the same canonical run mid-execution at
-10%, showing `RUNNING`, not an error.
+`landing.png` is the SwiftShader render with the real Earth texture, **21** datasets, 9 reference
+regions, 10 stored analyses, the latest Planetary Computer Aristarchus run (top similarity
+0.734), and the start of the real 3D terrain section. `datasets.png` shows the 21-product catalog
+and the Planetary Computer access note. `methodology.png` shows methodology version 0.3.0 with the
+persisted 58500974 configuration. `workspace.png` is the Planetary Computer run with the
+four-surface 3D terrain panel, five ready reports, all three candidates, and the NASADEM/ALOS and
+IO LULC evidence metrics. `terrain.png` is the `/terrain` explorer showing all **17** surfaces
+(8 Earth, 4 Moon, 5 Mars) and a real Earth Copernicus mesh. `progress.png` is the canonical run
+mid-execution at 10%, showing `RUNNING`, not an error.
 
 ### 5.3 Terrain fallback and GeoJSON integrity fixes
 
@@ -287,7 +401,8 @@ Two data-integrity issues were found during the audit and fixed:
   so a previously cached degenerate mesh is not served. The same coordinate now returns
   **HTTP 422** with an explicit “no real elevation” message. The canonical Copernicus candidate
   still returns **HTTP 200** with 6,400/6,400 valid cells and elevations from 1,031.93 m to
-  2,663.65 m. After the cache-version change, all **14** catalog surfaces (5 Earth, 4 Moon,
+  2,663.65 m. After the cache-version change, all **14** catalog surfaces present at that time
+  (5 Earth, 4 Moon,
   5 Mars) were re-requested: every one returned **HTTP 200**, **6,400/6,400** valid cells, and
   the expected LOLA, MOLA, or Copernicus source product; no cached mesh was degenerate.
 - **Earth CRS applied to planetary GeoJSON.** The GeoJSON report no longer writes a

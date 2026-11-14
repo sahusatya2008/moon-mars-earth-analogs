@@ -17,9 +17,11 @@ from shapely.geometry import box
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from ..catalog import dataset_map
+from ..catalog import CATALOG_VERSION, dataset_map
 from ..config import get_settings
 from ..connectors import albedo, firms, nominatim, preview, stac, worldcover
+from ..connectors import planetary_computer as pc
+from ..connectors.earth_dem import EarthDEM
 from ..connectors.planetary_dem import ReferenceDEM, load_reference_dem
 from ..connectors.raster import (
     EARTH_RADIUS_KM,
@@ -53,7 +55,6 @@ settings = get_settings()
 
 ALGORITHM_VERSION = "analogue-0.2.0"
 FEATURE_SCHEMA_VERSION = "features-0.2.0"
-CATALOG_VERSION = "0.2.0"
 RADII = {"earth": EARTH_RADIUS_KM, "moon": MOON_RADIUS_KM, "mars": MARS_RADIUS_KM}
 
 
@@ -333,6 +334,69 @@ def _reference_evidence(
         )
 
 
+PC_DEM_CROSSCHECKS = (
+    ("nasadem", "nasadem_hgt_v001", "NASADEM"),
+    ("alos-dem", "alos_world3d_30m", "ALOS World 3D-30m"),
+)
+
+
+def _parse_iso(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _add_optical_evidence(
+    db: Session,
+    *,
+    analysis_id: uuid.UUID,
+    candidate_id: uuid.UUID,
+    dataset_id: str,
+    title: str,
+    scenes: dict[str, Any],
+    citation: str,
+    license: str,
+    processing_level: str,
+    resolution_m: float,
+) -> bool:
+    items = scenes.get("items") or []
+    if not items:
+        return False
+    best = items[0]
+    db.add(
+        _evidence(
+            analysis_id=analysis_id,
+            candidate_id=candidate_id,
+            dataset_id=dataset_id,
+            title=title,
+            source_url=best.get("stac_item_url") or scenes.get("source"),
+            citation=citation,
+            license=license,
+            processing_level=processing_level,
+            spatial_resolution_m=resolution_m,
+            acquired_at=_parse_iso(best.get("datetime")),
+            details={
+                "role": "optical context (not scored)",
+                "scene_id": best.get("id"),
+                "cloud_cover": best.get("cloud_cover"),
+                "platform": best.get("platform"),
+                "preview_url": best.get("preview_url"),
+                "stac_item_url": best.get("stac_item_url"),
+                "scene_count": len(items),
+                "items": items,
+                "query": scenes.get("query"),
+                "caveat": (
+                    "Scene metadata and unsigned preview only; bulk imagery is not downloaded."
+                ),
+            },
+        )
+    )
+    return True
+
+
 def _candidate_context(
     db: Session,
     *,
@@ -341,18 +405,19 @@ def _candidate_context(
     lon: float,
     lat: float,
     footprint_km: float,
+    reference_dem: EarthDEM,
     start_date,
     end_date,
     include_stac: bool,
-) -> tuple[dict[str, Any], list[str]]:
+) -> tuple[dict[str, Any], list[str], set[str]]:
     """Collect optional real evidence for one candidate. Failures are recorded, not faked."""
     context: dict[str, Any] = {}
     errors: list[str] = []
+    used: set[str] = set()
+    bbox = footprint_bbox(lon, lat, footprint_km, EARTH_RADIUS_KM)[:4]
 
     try:
-        cover = worldcover.class_fractions(
-            *footprint_bbox(lon, lat, footprint_km, EARTH_RADIUS_KM)[:4]
-        )
+        cover = worldcover.class_fractions(*bbox)
         context["worldcover"] = cover
         db.add(
             _evidence(
@@ -360,9 +425,7 @@ def _candidate_context(
                 candidate_id=candidate_id,
                 dataset_id="esa_worldcover_2021",
                 title=f"ESA WorldCover context at {cover['dominant']}",
-                source_url=(
-                    "https://esa-worldcover.org/en"
-                ),
+                source_url="https://esa-worldcover.org/en",
                 citation="Zanaga et al. (2022), ESA WorldCover 10 m 2021 v200, doi:10.5281/zenodo.7254221.",
                 license="CC BY 4.0",
                 processing_level="L4",
@@ -370,55 +433,172 @@ def _candidate_context(
                 details={"role": "land-cover context (not scored)", **cover},
             )
         )
+        used.add("esa_worldcover_2021")
     except Exception as exc:
         context["worldcover"] = {"available": False, "error": str(exc)[:300]}
         errors.append("WorldCover land cover unavailable for this candidate.")
 
-    if include_stac:
+    try:
+        lulc = pc.lulc_fractions(
+            "io-lulc-annual-v02",
+            lon,
+            lat,
+            footprint_km,
+            prefer_year=getattr(end_date, "year", None),
+        )
+        if context.get("worldcover", {}).get("class_codes"):
+            lulc["worldcover_agreement"] = pc.landcover_agreement(context["worldcover"], lulc)
+        context["io_lulc"] = lulc
+        spec = dataset_map()["io_lulc_annual_v02"]
+        db.add(
+            _evidence(
+                analysis_id=analysis_id,
+                candidate_id=candidate_id,
+                dataset_id="io_lulc_annual_v02",
+                title=f"Planetary Computer IO LULC {lulc['year']} at {lulc['dominant']}",
+                source_url=spec["source_url"],
+                citation=spec["citation"],
+                license=spec["license"],
+                processing_level=spec["processing_level"],
+                spatial_resolution_m=spec["spatial_resolution_m"],
+                details={"role": "land-cover cross-check (not scored)", **lulc},
+            )
+        )
+        used.add("io_lulc_annual_v02")
+    except Exception as exc:
+        context["io_lulc"] = {"available": False, "error": str(exc)[:300]}
+        errors.append("Planetary Computer IO LULC unavailable for this candidate.")
+
+    for collection, dataset_id, label in PC_DEM_CROSSCHECKS:
+        key = f"pc_dem_{dataset_id}"
         try:
-            scenes = stac.search_sentinel2(
-                *footprint_bbox(lon, lat, footprint_km, EARTH_RADIUS_KM)[:4],
+            stats = pc.dem_crosscheck(
+                collection,
+                lon,
+                lat,
+                footprint_km,
+                reference_dem.window,
+                reference_dataset_id=reference_dem.dataset_id,
+                dataset_id=dataset_id,
+            )
+            context[key] = stats
+            spec = dataset_map()[dataset_id]
+            db.add(
+                _evidence(
+                    analysis_id=analysis_id,
+                    candidate_id=candidate_id,
+                    dataset_id=dataset_id,
+                    title=f"{label}: independent DEM cross-check",
+                    source_url=stats["source_url"],
+                    citation=spec["citation"],
+                    license=spec["license"],
+                    processing_level=spec["processing_level"],
+                    spatial_resolution_m=spec["spatial_resolution_m"],
+                    details={"role": "independent DEM cross-check (not scored)", **stats},
+                )
+            )
+            used.add(dataset_id)
+        except Exception as exc:
+            context[key] = {"available": False, "error": str(exc)[:300]}
+            errors.append(f"{label} DEM cross-check unavailable for this candidate.")
+
+    if include_stac:
+        pc_scenes: dict[str, Any] | None = None
+        try:
+            pc_scenes = pc.optical_context(
+                "sentinel-2-l2a",
+                lon,
+                lat,
+                footprint_km,
                 start=start_date,
                 end=end_date,
                 limit=3,
-                max_cloud=30.0,
+                cloud_lt=45.0,
             )
-            context["sentinel2"] = scenes
-            if scenes["items"]:
-                best = scenes["items"][0]
-                db.add(
-                    _evidence(
-                        analysis_id=analysis_id,
-                        candidate_id=candidate_id,
-                        dataset_id="sentinel2_l2a",
-                        title="Sentinel-2 L2A scene context",
-                        source_url=best.get("visual") or scenes["source"],
-                        citation="Sentinel-2 L2A, ESA Copernicus; Earth Search v1 by Element 84 on AWS Open Data.",
-                        license="CC BY 4.0",
-                        processing_level="L2A",
-                        spatial_resolution_m=10.0,
-                        acquired_at=(
-                            datetime.fromisoformat(best["datetime"].replace("Z", "+00:00"))
-                            if best.get("datetime")
-                            else None
-                        ),
-                        details={
-                            "role": "optical context (not scored)",
-                            "scene_id": best.get("id"),
-                            "cloud_cover": best.get("cloud_cover"),
-                            "query": scenes["query"],
-                            "caveat": "Scene metadata and thumbnail only; bulk imagery is not downloaded.",
-                        },
-                    )
-                )
+            context["pc_sentinel2"] = pc_scenes
+            if _add_optical_evidence(
+                db,
+                analysis_id=analysis_id,
+                candidate_id=candidate_id,
+                dataset_id="pc_sentinel2_l2a",
+                title="Planetary Computer Sentinel-2 L2A scene context",
+                scenes=pc_scenes,
+                citation=(
+                    "Sentinel-2 L2A, ESA Copernicus; Microsoft Planetary Computer "
+                    "STAC and SAS."
+                ),
+                license="CC BY 4.0",
+                processing_level="L2A",
+                resolution_m=10.0,
+            ):
+                used.add("pc_sentinel2_l2a")
         except Exception as exc:
-            context["sentinel2"] = {"available": False, "error": str(exc)[:300]}
-            errors.append("Sentinel-2 STAC context unavailable for this candidate.")
+            context["pc_sentinel2"] = {"available": False, "error": str(exc)[:300]}
+            errors.append("Planetary Computer Sentinel-2 context unavailable for this candidate.")
+
+        if not context.get("pc_sentinel2", {}).get("items"):
+            # Earth Search remains a documented fallback if the Planetary Computer query has
+            # no scenes or is unavailable.
+            try:
+                scenes = stac.search_sentinel2(
+                    *bbox,
+                    start=start_date,
+                    end=end_date,
+                    limit=3,
+                    max_cloud=30.0,
+                )
+                context["sentinel2"] = scenes
+                if scenes["items"] and _add_optical_evidence(
+                    db,
+                    analysis_id=analysis_id,
+                    candidate_id=candidate_id,
+                    dataset_id="sentinel2_l2a",
+                    title="Sentinel-2 L2A scene context (Earth Search fallback)",
+                    scenes=scenes,
+                    citation=(
+                        "Sentinel-2 L2A, ESA Copernicus; Earth Search v1 by Element 84 "
+                        "on AWS Open Data."
+                    ),
+                    license="CC BY 4.0",
+                    processing_level="L2A",
+                    resolution_m=10.0,
+                ):
+                    used.add("sentinel2_l2a")
+            except Exception as exc:
+                context["sentinel2"] = {"available": False, "error": str(exc)[:300]}
+                errors.append("Sentinel-2 STAC context unavailable for this candidate.")
+
+        try:
+            landsat = pc.optical_context(
+                "landsat-c2-l2",
+                lon,
+                lat,
+                footprint_km,
+                start=start_date,
+                end=end_date,
+                limit=3,
+                cloud_lt=50.0,
+            )
+            context["pc_landsat"] = landsat
+            if _add_optical_evidence(
+                db,
+                analysis_id=analysis_id,
+                candidate_id=candidate_id,
+                dataset_id="pc_landsat_c2_l2",
+                title="Planetary Computer Landsat Collection 2 L2 scene context",
+                scenes=landsat,
+                citation="Landsat Collection 2 Level-2, NASA/USGS; Microsoft Planetary Computer.",
+                license="Public domain (USGS/NASA)",
+                processing_level="L2",
+                resolution_m=30.0,
+            ):
+                used.add("pc_landsat_c2_l2")
+        except Exception as exc:
+            context["pc_landsat"] = {"available": False, "error": str(exc)[:300]}
+            errors.append("Planetary Computer Landsat context unavailable for this candidate.")
 
     try:
-        fire = firms.active_fires(
-            *footprint_bbox(lon, lat, footprint_km, EARTH_RADIUS_KM)[:4], days=2
-        )
+        fire = firms.active_fires(*bbox, days=2)
         context["firms"] = fire
         db.add(
             _evidence(
@@ -434,13 +614,18 @@ def _candidate_context(
                 details={"role": "thermal-anomaly context (not scored)", "count": fire["count"]},
             )
         )
+        used.add("firms_viirs")
     except Exception as exc:
         context["firms"] = {"available": False, "error": str(exc)[:200]}
         # A missing FIRMS key is an expected configuration state, not a data defect.
 
     try:
         prev = preview.region_preview("earth", lon, lat, footprint_km)
-        context["preview"] = {"url": prev["url"], "source": prev["source"], "attribution": prev["attribution"]}
+        context["preview"] = {
+            "url": prev["url"],
+            "source": prev["source"],
+            "attribution": prev["attribution"],
+        }
         db.add(
             _evidence(
                 analysis_id=analysis_id,
@@ -459,11 +644,12 @@ def _candidate_context(
                 },
             )
         )
+        used.add("nasa_gibs")
     except Exception as exc:
         context["preview"] = {"available": False, "error": str(exc)[:300]}
         errors.append("GIBS preview unavailable for this candidate.")
 
-    return context, errors
+    return context, errors, used
 
 
 def _persist_scores(
@@ -660,12 +846,15 @@ def run_analysis(analysis_id: uuid.UUID, job_id: uuid.UUID, db: Session) -> dict
     candidate_summaries: list[dict[str, Any]] = []
     persisted_scores: list[CandidateScore] = []
     context_errors: list[str] = []
+    used_context: set[str] = set()
     for index, score in enumerate(ordered):
         candidate = candidate_by_id.get(score.candidate_id)
         if candidate is None:
             continue
         lon, lat = candidate.lon, candidate.lat
         display_name, country, admin = nominatim.describe(lat, lon)
+        if country or admin:
+            used_context.add("nominatim_osm")
         metadata = {
             "body_id": "earth",
             "coarse_screen_score": candidate.coarse_score,
@@ -733,13 +922,14 @@ def run_analysis(analysis_id: uuid.UUID, job_id: uuid.UUID, db: Session) -> dict
                 },
             )
         )
-        ctx, errors = _candidate_context(
+        ctx, errors, used = _candidate_context(
             db,
             analysis_id=analysis_id,
             candidate_id=row.id,
             lon=lon,
             lat=lat,
             footprint_km=footprint_km,
+            reference_dem=candidate.dem,
             start_date=start_date,
             end_date=end_date,
             include_stac=include_stac,
@@ -747,6 +937,7 @@ def run_analysis(analysis_id: uuid.UUID, job_id: uuid.UUID, db: Session) -> dict
         metadata["context"] = ctx
         row.metadata_json = _jsonable(metadata)
         context_errors.extend(errors)
+        used_context.update(used)
 
         ranking = _persist_scores(db, analysis_id, row.id, index + 1, score)
         persisted_scores.append(score)
@@ -847,7 +1038,7 @@ def run_analysis(analysis_id: uuid.UUID, job_id: uuid.UUID, db: Session) -> dict
                     "source_url": dataset_map().get(ds, {}).get("source_url"),
                     "citation": dataset_map().get(ds, {}).get("citation"),
                 }
-                for ds in ("esa_worldcover_2021", "sentinel2_l2a", "nasa_gibs", "nominatim_osm")
+                for ds in sorted(used_context)
             ],
         ],
         "limitations": _limitations(region.body_id, ref_profile, result.screening),

@@ -84,7 +84,7 @@ export default async function HomePage() {
       <section className="hero">
         <div className="shell hero-grid">
           <div>
-            <div className="eyebrow">Planetary analogue intelligence · v0.2</div>
+            <div className="eyebrow">Planetary analogue intelligence · v0.3</div>
             <h1 className="display">
               <span className="terra">TERRA</span>
               <span className="x">-X</span>

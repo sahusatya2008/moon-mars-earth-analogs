@@ -14,6 +14,7 @@ import type {
   AssistantAnswer,
   CandidateDetail,
   Comparison,
+  Evidence,
   JobEvent,
   Ranking,
   Report,
@@ -28,6 +29,38 @@ const QUESTIONS = [
   "How much do the similarity methods disagree?",
   "What are the main limitations of this run?",
 ];
+
+function evidenceInsight(record: Evidence): string | null {
+  const details = record.details || {};
+  if (record.dataset_id === "nasadem_hgt_v001" || record.dataset_id === "alos_world3d_30m") {
+    const mae = details.mae_m;
+    const rmse = details.rmse_m;
+    const bias = details.bias_m;
+    const overlap = details.overlap_pixels;
+    if (typeof mae !== "number" || typeof rmse !== "number" || typeof bias !== "number") {
+      return null;
+    }
+    const cells = typeof overlap === "number" ? `${overlap.toLocaleString()} cells` : "overlapping cells";
+    return `Independent DEM cross-check: MAE ${mae.toFixed(2)} m, RMSE ${rmse.toFixed(2)} m, bias ${bias >= 0 ? "+" : ""}${bias.toFixed(2)} m across ${cells}. Context only, not scored.`;
+  }
+  if (record.dataset_id === "io_lulc_annual_v02") {
+    const agreement = details.worldcover_agreement;
+    if (agreement && typeof agreement === "object" && "agreement" in agreement) {
+      const value = (agreement as { agreement?: unknown }).agreement;
+      if (typeof value === "number") {
+        return `Broad-class agreement with ESA WorldCover: ${Math.round(value * 100)}%. Class definitions and epochs differ, so this is context only.`;
+      }
+    }
+  }
+  if (record.dataset_id === "pc_sentinel2_l2a" || record.dataset_id === "pc_landsat_c2_l2") {
+    const parts: string[] = [];
+    if (typeof details.cloud_cover === "number") parts.push(`cloud ${details.cloud_cover.toFixed(1)}%`);
+    if (typeof details.scene_count === "number") parts.push(`${details.scene_count} scene${details.scene_count === 1 ? "" : "s"} found`);
+    if (typeof details.platform === "string") parts.push(details.platform);
+    return parts.length ? `${parts.join(" · ")}. Metadata and preview only; bulk imagery is not downloaded.` : null;
+  }
+  return null;
+}
 
 function mergeEvents(current: JobEvent[], incoming: JobEvent[]): JobEvent[] {
   const byId = new Map(current.map((event) => [event.id, event]));
@@ -306,6 +339,25 @@ function CandidatePanel({
                   <span>{record.title}</span>
                   <span className="chip idle">{record.dataset_id}</span>
                 </div>
+                {evidenceInsight(record) ? (
+                  <div className="evidence-metrics">{evidenceInsight(record)}</div>
+                ) : null}
+                {typeof record.details?.preview_url === "string" &&
+                record.details.preview_url.startsWith("https://") ? (
+                  <a
+                    className="evidence-preview"
+                    href={record.details.preview_url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={record.details.preview_url}
+                      alt={`${record.dataset_id} scene preview`}
+                      loading="lazy"
+                    />
+                  </a>
+                ) : null}
                 <div className="evidence-cite">
                   {record.citation}
                   {record.source_url ? (

@@ -1,6 +1,7 @@
 # TERRA-X Architecture
 
-**Status:** implemented baseline · version 0.2.0  
+**Status:** implemented baseline · version 0.3.0
+
 **Scope:** planetary analogue discovery for Earth, the Moon, and Mars
 
 ## 1. Design position
@@ -37,6 +38,7 @@ The system is a **modular monolith plus independently scalable workers**:
              │ Scientific data layer                             │
              │ USGS LOLA/MOLA, Copernicus GLO-30, AWS Terrain     │
              │ Tiles, NASA GIBS/CMR, ESA WorldCover, Sentinel-2  │
+             │ Microsoft Planetary Computer (DEM/LULC/optical)   │
              └───────────────────────────────────────────────────┘
 ```
 
@@ -80,7 +82,7 @@ check so migrations have completed before jobs are claimed. The database port is
 
 ```
 apps/api/terrax/
-  __init__.py             version constants (0.2.0)
+  __init__.py             version constants (0.3.0)
   config.py               environment + cache/report paths
   db.py                   SQLAlchemy engine/session
   models.py               normalized PostGIS schema (22 tables)
@@ -108,6 +110,7 @@ apps/api/terrax/
     raster.py             common-grid warping, footprints, valid masks
     etopo.py              optional NOAA ETOPO access
     worldcover.py         ESA WorldCover 10 m land cover
+    planetary_computer.py Planetary Computer STAC, SAS signing, DEM/LULC/optical checks
     stac.py / cmr.py      Sentinel-2 and NASA CMR discovery
     gibs.py / trek.py     NASA imagery and planetary mosaics
     nominatim.py          reverse geocoding
@@ -144,7 +147,7 @@ infrastructure/docker/    API/worker and web images
 
 ## 5. Data flow
 
-1. **Catalog** seeds 16 real datasets, 3 bodies, and 9 preset regions with agency, mission,
+1. **Catalog** seeds 21 real datasets, 3 bodies, and 9 preset regions with agency, mission,
    resolution, license, citation, access protocol, and credential requirements.
 2. **Reference extraction** reads the Moon LOLA 128 ppd ISIS cube or Mars MOLA 463 m mosaic over
    the selected footprint. The window is reprojected to a 500 m local azimuthal-equidistant grid.
@@ -157,12 +160,15 @@ infrastructure/docker/    API/worker and web images
    fallback is recorded explicitly if used. Sites below 25% valid coverage are rejected.
 6. **Similarity** computes the primary tolerance-normalized MCDA and the configured secondary
    methods, with coverage penalties, method agreement, and confidence ceilings.
-7. **Persistence** stores feature measurements, evidence records, candidate rankings, scores,
+7. **Context** queries the Microsoft Planetary Computer for NASADEM/ALOS DEM cross-checks, IO
+   LULC agreement, and Sentinel-2/Landsat scenes. SAS-signed window reads are bounded; tokens and
+   signed URLs are never stored. These records are evidence-only and do not enter scoring.
+8. **Persistence** stores feature measurements, evidence records, candidate rankings, scores,
    methods, missing dimensions, manifest, and job events in one transaction.
-8. **Reporting** generates PDF, CSV, GeoJSON, JSON, and manifest exports from stored rows and
+9. **Reporting** generates PDF, CSV, GeoJSON, JSON, and manifest exports from stored rows and
    records size and SHA-256. GeoJSON features carry an explicit body id and spatial-reference
    block; a collection-wide Earth CRS is not applied to Moon or Mars coordinates.
-9. **Frontend** reads the same stored result; it never recomputes a rank.
+10. **Frontend** reads the same stored result; it never recomputes a rank.
 
 ## 6. Spatial conventions
 

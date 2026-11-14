@@ -6,6 +6,7 @@ import math
 from typing import Any
 
 import numpy as np
+from rasterio.enums import Resampling
 
 from .http import SourceUnavailable
 from .raster import EARTH_RADIUS_KM, read_dataset_bbox
@@ -53,7 +54,11 @@ def class_fractions(west: float, south: float, east: float, north: float, *, max
                 continue
             try:
                 segments, _meta = read_dataset_bbox(
-                    _tile_url(lat, lon), (w, s, e, n), decimated_max=max_pixels, radius_km=EARTH_RADIUS_KM
+                    _tile_url(lat, lon),
+                    (w, s, e, n),
+                    decimated_max=max_pixels,
+                    radius_km=EARTH_RADIUS_KM,
+                    resampling=Resampling.nearest,
                 )
             except Exception:
                 continue
@@ -73,11 +78,16 @@ def class_fractions(west: float, south: float, east: float, north: float, *, max
         LEGEND.get(int(c), f"Class {int(c)}"): round(float(n) / total, 5)
         for c, n in sorted(zip(classes, counts, strict=False), key=lambda x: -x[1])
     }
+    by_code = {
+        str(int(c)): round(float(n) / total, 5)
+        for c, n in zip(classes, counts, strict=False)
+    }
     dominant = max(fractions.items(), key=lambda kv: kv[1])[0]
     return {
         "source": "ESA WorldCover 2021 v200",
         "resolution_m": 10.0,
         "classes": fractions,
+        "class_codes": by_code,
         "dominant": dominant,
         "valid_pixels": total,
         "sample_resolution_m": round(

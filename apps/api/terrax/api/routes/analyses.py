@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ... import ALGORITHM_VERSION, FEATURE_SCHEMA_VERSION
+from ...catalog import CATALOG_VERSION
 from ...config import get_settings
 from ...db import SessionLocal
 from ...jobs import queue
@@ -94,7 +95,7 @@ def create_analysis(payload: AnalysisCreate, db: Session = Depends(get_db)):
         feature_schema_version=FEATURE_SCHEMA_VERSION,
         config=config,
         dataset_manifest={
-            "catalog_version": "0.2.0",
+            "catalog_version": CATALOG_VERSION,
             "algorithm_version": ALGORITHM_VERSION,
             "feature_schema_version": FEATURE_SCHEMA_VERSION,
             "status": "queued",

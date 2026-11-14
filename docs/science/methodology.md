@@ -1,6 +1,6 @@
 # TERRA-X Scientific Methodology
 
-**Version:** 0.2.0 · algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.2.0`
+**Version:** 0.3.0 · algorithm `analogue-0.2.0` · feature schema `features-0.2.0` · catalog `0.3.0`
 
 This document describes what the code actually computes. Declared constants are in
 `apps/api/terrax/engine/features.py` and `apps/api/terrax/engine/similarity.py`; each completed run
@@ -37,6 +37,25 @@ Earth candidates are re-measured from Copernicus GLO-30 whenever a tile is avail
 Copernicus tile is unavailable, the fallback is AWS Terrain Tiles and the product is recorded
 explicitly in the candidate provenance and manifest. The coarse stage never produces the final
 ranked score.
+
+### Independent cross-checks
+
+The Microsoft Planetary Computer supplies four context-only checks. None of them changes a
+similarity score, confidence, or candidate rank.
+
+| Product | Role | Comparison |
+|---|---|---|
+| NASADEM HGT v001 (30 m) | independent DEM | bias, MAE, RMSE, median difference, p95 absolute deviation, Pearson r, overlap count against the candidate Copernicus window |
+| ALOS World 3D-30m DSM (30 m) | independent DEM | same statistics against Copernicus |
+| IO 10 m Annual LULC V2 | land-cover cross-check | broad-class total-variation agreement with ESA WorldCover, with years and taxonomies recorded |
+| Sentinel-2 L2A and Landsat C2 L2 | optical context | recent scenes, cloud cover, platform, STAC item link, unsigned preview |
+
+DEM statistics are computed only on cells valid in both products. Vertical datums and acquisition
+epochs differ, so the statistics are a product-agreement check, not an accuracy assessment.
+Land-cover agreement maps both legends to broad classes before comparing distributions; the
+products use different class definitions and epochs, so disagreement is reported rather than
+resolved by preference. Planetary Computer data access uses public STAC metadata and automatic
+short-lived SAS tokens; tokens are never persisted.
 
 Absolute elevation is not compared across bodies. Earth uses an orthometric datum, the Moon uses a
 sphere-referenced radius, and Mars uses the MOLA areoid. The elevation **distribution** feature is

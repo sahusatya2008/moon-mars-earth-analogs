@@ -106,7 +106,7 @@ export default function DatasetsPage() {
   const runProbe = useCallback(async () => {
     setProbe((current) => ({ ...current, loading: true, error: null }));
     try {
-      const response = await api.probe(body === "all" ? undefined : body, 20);
+      const response = await api.probe(body === "all" ? undefined : body, 100);
       setAvailability((current) => {
         const next = { ...current };
         for (const row of response.datasets) next[row.dataset_id] = row;
@@ -143,9 +143,11 @@ export default function DatasetsPage() {
           <h2>The catalog is a contract</h2>
           <p style={{ marginTop: 10, maxWidth: 780 }}>
             Every product used by TERRA-X is registered with its agency, mission, resolution,
-            license, citation, and access protocol. Status is <b>unknown</b> until a bounded probe
-            reads the actual source. Credential-gated services are reported as gated, never as
-            connected.
+            license, citation, and access protocol. The Microsoft Planetary Computer collections
+            are read through public STAC metadata and automatically issued, short-lived SAS
+            tokens; the tokens are never stored with results. Status is <b>unknown</b> until a
+            bounded probe reads the actual source. Credential-gated services are reported as
+            gated, never as connected.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -186,10 +188,11 @@ export default function DatasetsPage() {
           </button>
         </div>
         <div className="tiny faint" style={{ marginTop: 12, lineHeight: 1.6 }}>
-          Probing performs one HEAD or single-byte range request per dataset. It checks reachability,
-          not scientific suitability, and it does not download data. Some archives published by
-          USGS or NASA reject automated HEAD requests from this network; that is recorded as
-          degraded rather than hidden.
+          Probing performs one bounded request per dataset: a HEAD or single-byte range read, or,
+          for Planetary Computer, STAC metadata plus a public SAS token check. It checks
+          reachability, not scientific suitability, and it does not download data. Some archives
+          published by USGS or NASA reject automated HEAD requests from this network; that is
+          recorded as degraded rather than hidden.
           {probe.checkedAt ? (
             <>
               {" "}

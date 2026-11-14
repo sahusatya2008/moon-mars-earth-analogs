@@ -172,12 +172,14 @@ def read_dataset_bbox(
     *,
     decimated_max: int = 4096,
     radius_km: float | None = None,
+    resampling: Resampling = Resampling.bilinear,
 ) -> tuple[list[Segment], dict[str, object]]:
     """Read segments of a single equirectangular raster covering a lon/lat bbox.
 
     Returns segments and product metadata. Handles antimeridian crossing by splitting.
     ``radius_km`` is required when the source is a projected body-fixed
-    equirectangular raster (Moon/Mars).
+    equirectangular raster (Moon/Mars). Categorical products must pass
+    ``Resampling.nearest`` so class codes are never interpolated.
     """
     west, south, east, north = bbox
     crossing = west > east
@@ -206,7 +208,7 @@ def read_dataset_bbox(
                     band,
                     window=window,
                     out_shape=(max(1, int(window.height) // scale), max(1, int(window.width) // scale)),
-                    resampling=Resampling.bilinear,
+                    resampling=resampling,
                 )
                 transform = transform * Affine.scale(window.width / arr.shape[1], window.height / arr.shape[0])
             else:

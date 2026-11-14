@@ -52,6 +52,31 @@ Element 84 on AWS Open Data
   Creative Commons Attribution 4.0 International (CC BY 4.0).
   https://registry.opendata.aws/sentinel-2/
 
+NASA NASADEM HGT v001, NASA/JPL and USGS, accessed through Microsoft Planetary Computer
+  Public domain (NASA). doi:10.5067/MEaSUREs/NASADEM/NASADEM_HGT.001.
+  https://lpdaac.usgs.gov/products/nasadem_hgtv001/
+
+ALOS World 3D-30m (AW3D30), Japan Aerospace Exploration Agency (JAXA), accessed through
+Microsoft Planetary Computer
+  JAXA AW3D30 terms, attribution required. Developed from ALOS PRISM (2006-2011).
+  https://www.eorc.jaxa.jp/ALOS/en/aw3d30/index.htm
+
+IO 10 m Annual Land Use Land Cover V2, Impact Observatory / Esri / Microsoft, accessed
+through Microsoft Planetary Computer
+  Creative Commons Attribution 4.0 International (CC BY 4.0).
+  https://planetarycomputer.microsoft.com/dataset/io-lulc-annual-v02
+
+Sentinel-2 L2A and Landsat Collection 2 Level-2 scene metadata and previews, accessed
+through Microsoft Planetary Computer
+  Sentinel-2: Creative Commons Attribution 4.0 International (CC BY 4.0).
+  Landsat: public domain (NASA/USGS).
+  https://planetarycomputer.microsoft.com/catalog
+
+Microsoft Planetary Computer STAC and SAS services, Microsoft
+  Public STAC metadata and short-lived SAS tokens for anonymous raster reads. Data
+  products retain their upstream licenses above.
+  https://planetarycomputer.microsoft.com/
+
 AWS Terrain Tiles (Mapzen/Tilezen), AWS Open Data / Tilezen
   Open Data Commons Attribution License (ODC-By).
   https://registry.opendata.aws/terrain-tiles/

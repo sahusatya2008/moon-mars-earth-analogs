@@ -112,7 +112,7 @@ export default async function MethodologyPage() {
     <main className="shell" style={{ padding: "34px 0 70px" }}>
       <div className="section-head">
         <div>
-          <div className="eyebrow">Methodology · version 0.2.0</div>
+          <div className="eyebrow">Methodology · version 0.3.0</div>
           <h2>Transparent by construction</h2>
           <p style={{ marginTop: 10, maxWidth: 820 }}>
             TERRA-X measures terrain, not appearances. The reference window and each Earth

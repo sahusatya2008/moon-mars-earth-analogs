@@ -1129,6 +1129,33 @@ p {
   color: var(--faint);
 }
 
+.evidence-metrics {
+  margin-top: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text);
+  background: rgba(74, 222, 128, 0.06);
+  border-left: 2px solid rgba(74, 222, 128, 0.45);
+  padding: 6px 9px;
+  border-radius: 0 6px 6px 0;
+}
+
+.evidence-preview {
+  display: block;
+  margin-top: 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+  max-width: 360px;
+}
+
+.evidence-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .tabs {
   display: flex;
   gap: 2px;

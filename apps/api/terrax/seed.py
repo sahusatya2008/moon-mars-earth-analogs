@@ -13,7 +13,7 @@ from shapely.geometry import box
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .catalog import DATASETS, PLANETS, PRESET_REGIONS
+from .catalog import CATALOG_VERSION, DATASETS, PLANETS, PRESET_REGIONS
 from .connectors.raster import EARTH_RADIUS_KM, MARS_RADIUS_KM, MOON_RADIUS_KM, footprint_bbox
 from .db import SessionLocal
 from .models import DatasetCollection, PlanetaryBody, PlanetaryRegion
@@ -115,7 +115,7 @@ def seed(db: Session | None = None) -> dict[str, int]:
             row.geometry = region_polygon(
                 preset["body_id"], preset["center_lon"], preset["center_lat"], preset["size_km"]
             )
-            row.metadata_json = {"preset": True, "catalog_version": "0.2.0"}
+            row.metadata_json = {"preset": True, "catalog_version": CATALOG_VERSION}
             counts["regions"] += 1
 
         session.commit()

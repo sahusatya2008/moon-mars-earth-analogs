@@ -7,6 +7,8 @@ real access URL, citation, licence, and whether it contributes to scoring.
 
 from __future__ import annotations
 
+CATALOG_VERSION = "0.3.0"
+
 PLANETS = [
     {
         "id": "earth",
@@ -140,6 +142,66 @@ DATASETS = [
         "is_scoring_input": False,
     },
     {
+        "id": "nasadem_hgt_v001",
+        "title": "NASADEM HGT v001 (30 m)",
+        "body_id": "earth",
+        "source_agency": "NASA JPL / USGS",
+        "mission": "NASADEM",
+        "instrument": "SRTM C-band radar",
+        "description": (
+            "Global 1 arc-second (~30 m) digital elevation model derived primarily from SRTM, "
+            "with improved void filling and processing. Read through the Microsoft Planetary "
+            "Computer as an independent cross-check of Copernicus; never a score input."
+        ),
+        "variable_names": ["surface_elevation"],
+        "access_protocol": "Microsoft Planetary Computer STAC + SAS-signed COG window reads",
+        "source_url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/nasadem",
+        "documentation_url": "https://lpdaac.usgs.gov/products/nasadem_hgtv001/",
+        "citation": (
+            "NASA/JPL, NASADEM HGT v001, NASA EOSDIS LP DAAC, "
+            "doi:10.5067/MEaSUREs/NASADEM/NASADEM_HGT.001."
+        ),
+        "license": "Public domain (NASA)",
+        "license_url": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+        "spatial_resolution_m": 30.0,
+        "temporal_resolution": "static",
+        "temporal_coverage": "2000",
+        "processing_level": "L3",
+        "requires_credentials": False,
+        "status": "unknown",
+        "is_scoring_input": False,
+    },
+    {
+        "id": "alos_world3d_30m",
+        "title": "ALOS World 3D-30m (AW3D30) DSM",
+        "body_id": "earth",
+        "source_agency": "Japan Aerospace Exploration Agency (JAXA)",
+        "mission": "ALOS",
+        "instrument": "PRISM",
+        "description": (
+            "Global 30 m digital surface model built from ALOS PRISM stereo imagery acquired "
+            "2006-2011. Read through the Microsoft Planetary Computer as an independent "
+            "cross-check of Copernicus; never a score input."
+        ),
+        "variable_names": ["surface_elevation"],
+        "access_protocol": "Microsoft Planetary Computer STAC + SAS-signed COG window reads",
+        "source_url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/alos-dem",
+        "documentation_url": "https://www.eorc.jaxa.jp/ALOS/en/aw3d30/index.htm",
+        "citation": (
+            "JAXA AW3D30 v3.2, developed from ALOS PRISM; Takaku et al. (2021), "
+            "ISPRS Archives XLIII-B4-2021, 129-134."
+        ),
+        "license": "JAXA AW3D30 terms (attribution)",
+        "license_url": "https://www.eorc.jaxa.jp/ALOS/en/aw3d30/data/index.htm",
+        "spatial_resolution_m": 30.0,
+        "temporal_resolution": "static",
+        "temporal_coverage": "2006-2011",
+        "processing_level": "L3",
+        "requires_credentials": False,
+        "status": "unknown",
+        "is_scoring_input": False,
+    },
+    {
         "id": "lro_wac_mosaic",
         "title": "LRO WAC global mosaic (303 ppd)",
         "body_id": "moon",
@@ -249,6 +311,36 @@ DATASETS = [
         "is_scoring_input": False,
     },
     {
+        "id": "io_lulc_annual_v02",
+        "title": "IO 10 m Annual Land Use Land Cover V2 (2017-2023)",
+        "body_id": "earth",
+        "source_agency": "Impact Observatory / Esri / Microsoft",
+        "mission": "Impact Observatory LULC",
+        "instrument": "Sentinel-2 MSI",
+        "description": (
+            "Annual global 10 m land-cover maps derived from Sentinel-2 with a nine-class "
+            "schema. Read through the Microsoft Planetary Computer to cross-check WorldCover "
+            "class fractions; never a score input."
+        ),
+        "variable_names": ["land_cover_class"],
+        "access_protocol": "Microsoft Planetary Computer STAC + SAS-signed COG window reads",
+        "source_url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/io-lulc-annual-v02",
+        "documentation_url": "https://planetarycomputer.microsoft.com/dataset/io-lulc-annual-v02",
+        "citation": (
+            "Impact Observatory, Microsoft, and Esri (2023), 10m Annual Land Use Land Cover "
+            "(9-class) V2; Karra et al. (2021), IGARSS 2021."
+        ),
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "spatial_resolution_m": 10.0,
+        "temporal_resolution": "annual",
+        "temporal_coverage": "2017-2023",
+        "processing_level": "L4 / derived",
+        "requires_credentials": False,
+        "status": "unknown",
+        "is_scoring_input": False,
+    },
+    {
         "id": "sentinel2_l2a",
         "title": "Sentinel-2 L2A surface reflectance",
         "body_id": "earth",
@@ -266,6 +358,60 @@ DATASETS = [
         "temporal_resolution": "5 days",
         "temporal_coverage": "2015-present",
         "processing_level": "L2A",
+        "requires_credentials": False,
+        "status": "unknown",
+        "is_scoring_input": False,
+    },
+    {
+        "id": "pc_sentinel2_l2a",
+        "title": "Sentinel-2 L2A via Microsoft Planetary Computer",
+        "body_id": "earth",
+        "source_agency": "ESA / Copernicus",
+        "mission": "Sentinel-2",
+        "instrument": "MSI",
+        "description": (
+            "Analysis-ready surface reflectance discovered through the Planetary Computer STAC "
+            "API and signed for metadata, preview, and window access. Optical context only; "
+            "bulk imagery is not downloaded."
+        ),
+        "variable_names": ["surface_reflectance"],
+        "access_protocol": "Microsoft Planetary Computer STAC + SAS-signed COG",
+        "source_url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a",
+        "documentation_url": "https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a",
+        "citation": "Sentinel-2 L2A, ESA Copernicus; Microsoft Planetary Computer STAC and SAS.",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "spatial_resolution_m": 10.0,
+        "temporal_resolution": "5 days",
+        "temporal_coverage": "2015-present",
+        "processing_level": "L2A",
+        "requires_credentials": False,
+        "status": "unknown",
+        "is_scoring_input": False,
+    },
+    {
+        "id": "pc_landsat_c2_l2",
+        "title": "Landsat Collection 2 Level-2 via Microsoft Planetary Computer",
+        "body_id": "earth",
+        "source_agency": "NASA / USGS",
+        "mission": "Landsat 4-9",
+        "instrument": "TM / ETM+ / OLI / TIRS",
+        "description": (
+            "Atmospherically corrected Landsat surface reflectance and surface temperature "
+            "discovered through the Planetary Computer STAC API. Optical context only; bulk "
+            "imagery is not downloaded."
+        ),
+        "variable_names": ["surface_reflectance", "surface_temperature"],
+        "access_protocol": "Microsoft Planetary Computer STAC + SAS-signed COG",
+        "source_url": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/landsat-c2-l2",
+        "documentation_url": "https://www.usgs.gov/landsat-missions/landsat-collection-2-level-2-science-products",
+        "citation": "Landsat Collection 2 Level-2, NASA/USGS; Microsoft Planetary Computer STAC and SAS.",
+        "license": "Public domain (USGS/NASA)",
+        "license_url": "https://www.usgs.gov/centers/eros/data-policy",
+        "spatial_resolution_m": 30.0,
+        "temporal_resolution": "16 days",
+        "temporal_coverage": "1982-present",
+        "processing_level": "L2",
         "requires_credentials": False,
         "status": "unknown",
         "is_scoring_input": False,
@@ -522,4 +668,4 @@ def dataset_map() -> dict[str, dict]:
     return {d["id"]: d for d in DATASETS}
 
 
-__all__ = ["PLANETS", "DATASETS", "PRESET_REGIONS", "dataset_map"]
+__all__ = ["CATALOG_VERSION", "PLANETS", "DATASETS", "PRESET_REGIONS", "dataset_map"]

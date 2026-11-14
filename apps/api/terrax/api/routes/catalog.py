@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ...catalog import dataset_map
-from ...connectors import copernicus_dem, gibs, trek, worldcover
+from ...connectors import copernicus_dem, gibs, planetary_computer, trek, worldcover
 from ...connectors.http import head
 from ...connectors.stac import SEARCH
 from ...models import DatasetCollection, PlanetaryBody
@@ -26,6 +26,14 @@ from ...schemas import (
 from ..deps import get_db
 
 router = APIRouter(tags=["catalog"])
+
+PLANETARY_COMPUTER_DATASETS = {
+    "nasadem_hgt_v001": "nasadem",
+    "alos_world3d_30m": "alos-dem",
+    "io_lulc_annual_v02": "io-lulc-annual-v02",
+    "pc_sentinel2_l2a": "sentinel-2-l2a",
+    "pc_landsat_c2_l2": "landsat-c2-l2",
+}
 
 
 @router.get("/planets", response_model=list[PlanetRead])
@@ -101,6 +109,10 @@ def probe_dataset(dataset_id: str) -> DatasetAvailability:
     if dataset_id == "nasa_gibs":
         status, detail, http_status = gibs.probe()
         probe_url = gibs.BASE
+    elif dataset_id in PLANETARY_COMPUTER_DATASETS:
+        collection = PLANETARY_COMPUTER_DATASETS[dataset_id]
+        status, detail, http_status = planetary_computer.probe(collection)
+        probe_url = planetary_computer.collection_url(collection)
     elif dataset_id == "copernicus_dem_glo30":
         ok = copernicus_dem.tile_exists(36, 138)
         status, detail = (
@@ -173,7 +185,7 @@ def probe_dataset(dataset_id: str) -> DatasetAvailability:
 def probe_datasets(
     body_id: str | None = Query(default=None),
     dataset_id: list[str] | None = Query(default=None),
-    limit: int = Query(default=8, ge=1, le=20),
+    limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     stmt = select(DatasetCollection)
