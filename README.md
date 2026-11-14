@@ -83,6 +83,30 @@ smooth vertical exaggeration; if the imagery request fails it falls back to the 
 Imagery never contributes to elevation or similarity scoring, and the payload records its source
 under `imagery` (cache version `terrain3d-v3`).
 
+## One-command runner
+
+`run.sh` installs dependencies, stops old project processes, starts PostGIS, applies migrations,
+seeds the catalog, builds the web app, starts the API, worker, and web app, and verifies health.
+Requires Docker Desktop (or Docker Engine with Compose) and `curl`; it installs `uv` and Node.js
+through Homebrew or the official installer when they are missing.
+
+```bash
+./run.sh                # full clean start: install, stop old processes, build, start, verify
+./run.sh restart        # same as the default
+./run.sh start          # start without reinstalling dependencies
+./run.sh stop           # stop API, worker, and web (keeps PostGIS)
+./run.sh stop --all     # also stop PostGIS
+./run.sh status         # process, database, and health status
+./run.sh logs api       # follow logs: api, worker, web, db, or all
+./run.sh install        # install/update Python and Node dependencies only
+./run.sh doctor         # check prerequisites and current state
+```
+
+Runtime PIDs and logs are written to `.run/`, which is gitignored. Ports `3000` and `8000` are
+checked before startup; the runner only stops processes whose working directory is this repository.
+Use `--skip-install` or `--skip-build` with `run`/`restart` to reuse existing dependencies or the
+current production build, and `--open` to open the web app after a successful start.
+
 ## Quick start (Docker)
 
 Requires Docker with Compose. No scientific credentials are needed for the core workflow.
