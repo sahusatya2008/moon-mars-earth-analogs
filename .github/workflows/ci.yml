@@ -48,6 +48,8 @@ jobs:
         run: uv run ruff check terrax tests
       - name: Apply migrations
         run: uv run alembic upgrade head
+      - name: Seed catalog
+        run: uv run python -m terrax.seed
       - name: Test
         run: uv run pytest -q
 
